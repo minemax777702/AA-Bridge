@@ -16,10 +16,14 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: android-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
 
@@ -45,7 +49,25 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build debug APK and run unit tests
-        run: ./gradlew assembleDebug testDebugUnitTest --no-daemon
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p audit
+          for attempt in 1 2 3; do
+            if ./gradlew assembleDebug testDebugUnitTest --no-daemon 2>&1 | tee "audit/build-attempt-${attempt}.log"; then
+              exit 0
+            fi
+            if ! grep -Eiq 'status code 429|HTTP[ /]+429|Too Many Requests' "audit/build-attempt-${attempt}.log"; then
+              exit 1
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              exit 1
+            fi
+            delay=$((60 * attempt))
+            echo "::warning::Repository rate limit; retrying in ${delay}s"
+            sleep "$delay"
+          done
+          exit 1
 
       - name: Export resolved dependency inventory
         run: |
@@ -56,7 +78,7 @@ jobs:
         run: python3 ci/osv-audit.py
 
       - name: Antivirus scan of APK and extracted contents
-        if: success() || failure()
+        if: ${{ !cancelled() && hashFiles('app/build/outputs/apk/debug/app-debug.apk') != '' }}
         run: |
           set -euo pipefail
           mkdir -p audit
@@ -71,7 +93,7 @@ jobs:
           clamscan --recursive --infected --max-filesize=100M --max-scansize=400M app/build/outputs/apk/debug/app-debug.apk "$scan_dir" | tee -a audit/clamav.txt
 
       - name: Verify APK signature and manifest
-        if: success() || failure()
+        if: ${{ !cancelled() && hashFiles('app/build/outputs/apk/debug/app-debug.apk') != '' }}
         run: |
           set -euo pipefail
           mkdir -p audit
