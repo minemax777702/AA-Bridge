@@ -101,4 +101,6 @@
     <string name="ui_not_connected">Не подключено</string>
     <string name="ui_setup_step">Шаг %1$d из 4</string>
     <string name="ui_setup_later">Подключиться позже</string>
+    <string name="ui_connection_details">Подключение</string>
+    <string name="ui_settings_advanced_summary">Экран, звук, подключение и диагностика</string>
 </resources>

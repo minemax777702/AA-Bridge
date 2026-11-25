@@ -9,7 +9,14 @@ import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.HorizontalDivider
@@ -26,8 +33,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -42,7 +47,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
@@ -160,30 +164,16 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenNearby: () -> Unit) {
         ) {
             Column(Modifier.widthIn(max = 520.dp).fillMaxWidth()) {
                 Spacer(Modifier.height(24.dp))
+                ConnectionHero(state, title, stringResource(body))
+                Spacer(Modifier.height(16.dp))
                 Column(
-                    Modifier.fillMaxWidth().background(Dash.Tile, RoundedCornerShape(28.dp)).padding(24.dp),
+                    Modifier.fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    val car = painterResource(R.drawable.ic_car)
-                    val warning = rememberVectorPainter(Icons.Rounded.Warning)
-                    when (state) {
-                        HomeState.READY -> StatusRing(RingMode.IDLE, car, stringResource(R.string.ring_ready))
-                        HomeState.SEARCHING -> StatusRing(RingMode.SPIN, car, stringResource(R.string.ring_searching))
-                        HomeState.CONNECTING -> StatusRing(RingMode.SPIN, car, stringResource(R.string.ring_connecting))
-                        HomeState.CONNECTED -> StatusRing(RingMode.FULL, car, stringResource(R.string.ring_connected))
-                        HomeState.NEEDS_TAP -> StatusRing(RingMode.ALERT, painterResource(R.drawable.ic_touch_app), stringResource(R.string.ring_needs_tap))
-                        HomeState.NOT_FOUND -> StatusRing(RingMode.ALERT, warning, stringResource(R.string.ring_not_found))
-                        HomeState.WIFI_OFF -> StatusRing(RingMode.ALERT, warning, stringResource(R.string.ring_wifi_off))
-                    }
-                    Spacer(Modifier.height(18.dp))
-                    Text(title, style = MaterialTheme.typography.headlineMedium, color = Dash.Text, textAlign = TextAlign.Center)
-                    Spacer(Modifier.height(8.dp))
-                    Text(stringResource(body), style = MaterialTheme.typography.bodyMedium, color = Dash.Muted, textAlign = TextAlign.Center)
                     if (state == HomeState.NEEDS_TAP) {
-                        Spacer(Modifier.height(16.dp))
                         MenuHint(stringResource(R.string.menu_start_server))
+                        Spacer(Modifier.height(16.dp))
                     }
-                    Spacer(Modifier.height(24.dp))
                     HomeActions(state, connection, onOpenNearby)
                 }
                 if (state == HomeState.NOT_FOUND) {
@@ -192,7 +182,9 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenNearby: () -> Unit) {
                         SuggestionTile(found.name) { startWireless(context, found.address, found.name) }
                     }
                 }
-                Spacer(Modifier.height(20.dp))
+                Spacer(Modifier.height(32.dp))
+                Text(stringResource(R.string.ui_connection_details), color = Dash.Muted,
+                    style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(start = 4.dp, bottom = 12.dp))
                 Column(Modifier.fillMaxWidth().background(Dash.Tile, RoundedCornerShape(20.dp)).padding(horizontal = 16.dp)) {
                     ConnectionDetail(R.drawable.ic_server, stringResource(R.string.tile_server),
                         stringResource(if (serverRunning) R.string.ui_active else R.string.ui_inactive), serverRunning)
@@ -205,6 +197,55 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenNearby: () -> Unit) {
                 Spacer(Modifier.height(24.dp))
             }
         }
+    }
+}
+
+@Composable
+private fun ConnectionHero(state: HomeState, title: String, body: String) {
+    val accent = when (state) {
+        HomeState.CONNECTED -> Color(0xFF9ED9B8)
+        HomeState.NEEDS_TAP, HomeState.NOT_FOUND, HomeState.WIFI_OFF -> Dash.Amber
+        else -> Dash.Teal
+    }
+    val status = when (state) {
+        HomeState.READY -> R.string.ring_ready
+        HomeState.CONNECTED -> R.string.ring_connected
+        HomeState.SEARCHING -> R.string.ring_searching
+        HomeState.CONNECTING -> R.string.ring_connecting
+        HomeState.NEEDS_TAP -> R.string.ring_needs_tap
+        HomeState.NOT_FOUND -> R.string.ring_not_found
+        HomeState.WIFI_OFF -> R.string.ring_wifi_off
+    }
+    val shape = RoundedCornerShape(28.dp)
+    Column(
+        Modifier.fillMaxWidth().clip(shape)
+            .background(Brush.verticalGradient(listOf(Color(0xFF222D40), Dash.Tile)))
+            .border(1.dp, Color(0xFF35435A), shape)
+            .padding(22.dp),
+    ) {
+        Row(
+            Modifier.background(accent.copy(alpha = 0.12f), RoundedCornerShape(50)).padding(horizontal = 12.dp, vertical = 7.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(7.dp),
+        ) {
+            if (state == HomeState.SEARCHING || state == HomeState.CONNECTING) {
+                CircularProgressIndicator(Modifier.size(12.dp), color = accent, strokeWidth = 1.5.dp)
+            } else {
+                Box(Modifier.size(7.dp).background(accent, CircleShape))
+            }
+            Text(stringResource(status), color = accent, style = MaterialTheme.typography.labelMedium)
+        }
+        Spacer(Modifier.height(20.dp))
+        Image(
+            painterResource(R.drawable.ic_connection_hero),
+            contentDescription = null,
+            modifier = Modifier.fillMaxWidth().aspectRatio(300f / 128f),
+            alpha = if (state == HomeState.CONNECTED) 1f else 0.75f,
+        )
+        Spacer(Modifier.height(22.dp))
+        Text(title, color = Dash.Text, style = MaterialTheme.typography.headlineMedium.copy(fontSize = 30.sp, lineHeight = 36.sp))
+        Spacer(Modifier.height(8.dp))
+        Text(body, color = Dash.Muted, style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 22.sp))
     }
 }
 
@@ -227,7 +268,12 @@ private fun HomeActions(state: HomeState, connection: ConnectionSnapshot, onOpen
     when (state) {
         HomeState.READY -> GlowButton(stringResource(R.string.home_connect_wireless), onOpenNearby)
         HomeState.SEARCHING, HomeState.CONNECTING -> DashLink(stringResource(R.string.home_use_another_car), onOpenNearby)
-        HomeState.CONNECTED -> if (connection.link == CarLink.WIRELESS) DashLink(stringResource(R.string.home_disconnect)) { stopLink(context) }
+        HomeState.CONNECTED -> if (connection.link == CarLink.WIRELESS) {
+            androidx.compose.material3.OutlinedButton(onClick = { stopLink(context) },
+                modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
+                Text(stringResource(R.string.home_disconnect))
+            }
+        }
         HomeState.NEEDS_TAP -> AmberButton(stringResource(R.string.open_aa), { AndroidAutoServer.openSettings(context) })
         HomeState.NOT_FOUND -> {
             GlowButton(stringResource(R.string.home_try_again), { retryWireless(context, connection) })

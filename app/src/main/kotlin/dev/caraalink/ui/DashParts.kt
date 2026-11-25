@@ -14,6 +14,8 @@ import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
 import dev.caraalink.R
 import dev.caraalink.ui.theme.Dash
@@ -58,7 +60,7 @@ fun Telltale(icon: Painter, label: String, lamp: Lamp) {
 
 @Composable
 fun GlowButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Button(onClick = onClick, modifier = modifier.fillMaxWidth().heightIn(min = 52.dp),
+    Button(onClick = onClick, modifier = modifier.fillMaxWidth().heightIn(min = 56.dp),
         shape = RoundedCornerShape(16.dp)) {
         Text(text, textAlign = TextAlign.Center, style = MaterialTheme.typography.labelLarge)
     }
@@ -96,9 +98,9 @@ fun DashTopBar(onOpenSettings: () -> Unit) {
                     tint = Dash.Teal, modifier = Modifier.size(22.dp))
             }
             Spacer(Modifier.width(12.dp))
-            Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleLarge)
+            Text("AA Bridge", style = MaterialTheme.typography.titleLarge.copy(fontSize = 23.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.5).sp))
         }
-        IconButton(onClick = onOpenSettings) {
+        IconButton(onClick = onOpenSettings, modifier = Modifier.background(Dash.Tile, RoundedCornerShape(16.dp))) {
             Icon(Icons.Rounded.Settings, contentDescription = stringResource(R.string.settings), tint = Dash.Muted)
         }
     }

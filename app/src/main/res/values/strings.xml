@@ -107,4 +107,6 @@
     <string name="ui_not_connected">Not connected</string>
     <string name="ui_setup_step">Step %1$d of 4</string>
     <string name="ui_setup_later">Connect later</string>
+    <string name="ui_connection_details">Connection details</string>
+    <string name="ui_settings_advanced_summary">Display, audio, connection and diagnostics</string>
 </resources>
