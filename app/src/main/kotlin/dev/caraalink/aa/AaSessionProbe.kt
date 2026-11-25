@@ -1,6 +1,8 @@
 package dev.caraalink.aa
 
 import android.content.Context
+import dev.caraalink.link.CarbitAudioTransport
+import dev.caraalink.settings.AppSettings
 import android.os.Process
 import android.util.Log
 import dev.caraalink.diagnostics.DiagnosticLogger
@@ -182,6 +184,27 @@ class AaSessionProbe(
     private var audioPlayer: AaAudioPlayer? = null
 
     @Volatile private var pcmPlayer: AaPcmPlayer? = null
+    @Volatile private var speechPlayer: AaPcmPlayer? = null
+    @Volatile private var speechStream = CarbitAudioTransport.Stream.TTS
+    @Volatile private var voiceRequested = false
+    @Volatile private var voiceFocus = false
+    @Volatile private var carbitMicCapture: AaCarbitMicCapture? = null
+
+    private fun stopMicrophone() {
+        voiceRequested = false
+        carbitMicCapture?.stop()
+        carbitMicCapture = null
+        micCapture?.stop()
+        micCapture = null
+    }
+
+    private fun carbitEnabled(): Boolean =
+        !config.preview && running.get() && carbitAudio != null &&
+            AppSettings.aaAudioRoute(context) == AppSettings.AaAudioRoute.CARBIT_EXPERIMENTAL
+
+    private fun speechKind(): CarbitAudioTransport.Stream =
+        if (voiceRequested || voiceFocus) CarbitAudioTransport.Stream.VR else CarbitAudioTransport.Stream.TTS
+
 
     @Volatile private var carbitAudio: dev.caraalink.link.CarbitAudioTransport? = null
 
@@ -189,6 +212,7 @@ class AaSessionProbe(
     internal fun attachCarbitAudio(audio: dev.caraalink.link.CarbitAudioTransport?) {
         if (carbitAudio === audio) return
         carbitAudio?.stopPlayback()
+        carbitAudio?.stopMic()
         carbitAudio = audio
     }
 
@@ -337,6 +361,7 @@ class AaSessionProbe(
         }
         logger.log("=== session probe stopped")
         if (active === this) active = null
+        voiceRequested = false
         // Confirmed from mrmees/open-android-auto's own protocol docs
         // (docs/interactions/05-session-maintenance-teardown.md, GPL-3.0,
         // facts only): a session end is supposed to be announced with
@@ -630,7 +655,8 @@ class AaSessionProbe(
                         }
                     } else if (chId == AaFraming.MSG_MEDIA_START &&
                         (message.channelId == AaServiceDiscovery.CHANNEL_MEDIA_SINK_VIDEO ||
-                            message.channelId == AaServiceDiscovery.CHANNEL_MEDIA_SINK_MEDIA_AUDIO)
+                            message.channelId == AaServiceDiscovery.CHANNEL_MEDIA_SINK_MEDIA_AUDIO ||
+                            message.channelId == AaServiceDiscovery.CHANNEL_MEDIA_SINK_SPEECH_AUDIO)
                     ) {
                         // AVChannelStartIndication{session=1, config=2}: the
                         // `session` value must be echoed back in every
@@ -638,6 +664,20 @@ class AaSessionProbe(
                         val session = AaProtobuf.parse(chBody).firstOrNull { it.number == 1 }?.varint?.toInt() ?: 0
                         avAckSession[message.channelId] = session
                         logger.log("RX MEDIA_START on ${AaFraming.channelName(message.channelId)} session=$session")
+                        if (message.channelId == AaServiceDiscovery.CHANNEL_MEDIA_SINK_SPEECH_AUDIO) {
+                            val kind = speechKind()
+                            audioExecutor.execute {
+                                speechPlayer?.stop()
+                                carbitAudio?.stopStream(speechStream)
+                                speechStream = kind
+                                if (carbitEnabled()) carbitAudio?.startStream(kind)
+                                speechPlayer = AaPcmPlayer(context, config.preview) { pcm ->
+                                    carbitEnabled() && carbitAudio?.play(kind, pcm) == true
+                                }
+                            }
+                        } else if (message.channelId == AaServiceDiscovery.CHANNEL_MEDIA_SINK_MEDIA_AUDIO && !phoneMediaAudio && carbitEnabled()) {
+                            audioExecutor.execute { if (carbitEnabled()) carbitAudio?.startStream(CarbitAudioTransport.Stream.MUSIC) }
+                        }
                     } else if (chId == AaFraming.MSG_MEDIA_DATA && message.channelId == AaServiceDiscovery.CHANNEL_MEDIA_SINK_VIDEO) {
                         // handleMediaWithTimestampIndication(): payload is an
                         // 8-byte big-endian Timestamp (microseconds) followed
@@ -710,10 +750,27 @@ class AaSessionProbe(
                         // root cause of "no music, ever" (not a routing or
                         // AudioTrack-timing bug after all).
                         sendAvAck(channel, message.channelId)
+                    } else if (message.channelId == AaServiceDiscovery.CHANNEL_MEDIA_SINK_SPEECH_AUDIO &&
+                        (chId == AaFraming.MSG_MEDIA_DATA || chId == AaFraming.MSG_MEDIA_CODEC_CONFIG)
+                    ) {
+                        // PCM has an eight-byte timestamp on DATA; config is not sound.
+                        if (chId == AaFraming.MSG_MEDIA_DATA && chBody.size > 8) {
+                            val pcm = chBody.copyOfRange(8, chBody.size)
+                            audioExecutor.execute { speechPlayer?.feed(pcm) }
+                        }
+                        sendAvAck(channel, message.channelId)
+                    } else if (chId == AaFraming.MSG_MEDIA_STOP &&
+                        message.channelId == AaServiceDiscovery.CHANNEL_MEDIA_SINK_SPEECH_AUDIO
+                    ) {
+                        audioExecutor.execute {
+                            speechPlayer?.stop()
+                            speechPlayer = null
+                            carbitAudio?.stopStream(speechStream)
+                        }
                     } else if (chId == AaFraming.MSG_MEDIA_STOP &&
                         message.channelId == AaServiceDiscovery.CHANNEL_MEDIA_SINK_MEDIA_AUDIO
                     ) {
-                        audioExecutor.execute { carbitAudio?.stopPlayback() }
+                        audioExecutor.execute { carbitAudio?.stopStream(CarbitAudioTransport.Stream.MUSIC) }
                     } else if (chId == AaFraming.MSG_MEDIA_VIDEO_FOCUS_REQUEST) {
                         // NATIVE(2) is the driver's Exit (as openauto reads it) unless the reason is PHONE_SCREEN_OFF(1). Phones
                         // also send one at startup, so it only counts once video has arrived on this connection.
@@ -732,26 +789,34 @@ class AaSessionProbe(
                         // Response fields: session ID (1), result value (2: 0 success, 1 failure).
                         val open = AaProtobuf.parse(chBody).firstOrNull { it.number == 1 }?.varint == 1L
                         logger.log("RX MICROPHONE_REQUEST open=$open")
-                        micCapture?.stop()
-                        micCapture = null
-                        val capture = if (open) AaMicCapture(context) { pcm ->
-                            val payload = ByteArray(8 + pcm.size)
-                            var ts = System.nanoTime() / 1000
-                            for (i in 7 downTo 0) { payload[i] = (ts and 0xFF).toByte(); ts = ts shr 8 }
-                            pcm.copyInto(payload, 8)
-                            runCatching {
-                                channel.sendChannelSpecific(message.channelId, AaFraming.MSG_MEDIA_DATA, payload)
-                            }.onFailure { logger.log("Microphone send failed: $it") }
-                        } else null
-                        micCapture = capture
-                        val success = capture?.prepare() ?: !open
-                        val response = AaProtobuf.Writer().int(1, 0).int(2, if (success) 0 else 1).build()
-                        channel.sendChannelSpecific(message.channelId, AaFraming.MSG_MEDIA_MICROPHONE_RESPONSE, response)
-                        if (success) capture?.startStreaming()
-                        else {
-                            capture?.stop()
-                            micCapture = null
+                        stopMicrophone()
+                        voiceRequested = open
+                        val micChannel = message.channelId
+                        val sendMic: (ByteArray) -> Unit = { pcm ->
+                            // No capture or forwarding after close/shutdown or on a stale channel.
+                            if (voiceRequested && running.get() && activeChannel === channel) {
+                                val payload = ByteArray(8 + pcm.size)
+                                var ts = System.nanoTime() / 1000
+                                for (i in 7 downTo 0) { payload[i] = (ts and 0xFF).toByte(); ts = ts shr 8 }
+                                pcm.copyInto(payload, 8)
+                                runCatching {
+                                    channel.sendChannelSpecific(micChannel, AaFraming.MSG_MEDIA_DATA, payload)
+                                }.onFailure { logger.log("Microphone send failed: $it") }
+                            }
                         }
+                        val remote = if (open && carbitEnabled() && AppSettings.carbitMicEnabled(context)) {
+                            carbitAudio?.let { AaCarbitMicCapture(context, it, sendMic) }
+                        } else null
+                        if (remote?.prepare() == true) carbitMicCapture = remote
+                        val capture = if (open && carbitMicCapture == null) AaMicCapture(context, sendMic) else null
+                        micCapture = capture
+                        val success = !open || carbitMicCapture != null || capture?.prepare() == true
+                        val response = AaProtobuf.Writer().int(1, 0).int(2, if (success) 0 else 1).build()
+                        channel.sendChannelSpecific(micChannel, AaFraming.MSG_MEDIA_MICROPHONE_RESPONSE, response)
+                        if (success && running.get()) {
+                            carbitMicCapture?.startStreaming()
+                            capture?.startStreaming()
+                        } else stopMicrophone()
                     } else if (chId == AaFraming.MSG_INPUT_BINDING_REQUEST && message.channelId == AaServiceDiscovery.CHANNEL_INPUT_SOURCE) {
                         // Key binding for steering-wheel buttons; openauto answers BindingResponse{status=OK(0)}.
                         logger.log("RX INPUT_BINDING_REQUEST -> OK")
@@ -783,6 +848,7 @@ class AaSessionProbe(
                         everEstablished = true
                         runCatching { onEstablished?.invoke() }
                         val discoveryConfig = AaServiceDiscovery.configFromSettings(context, preview = config.preview)
+                            .copy(carbitSpeech = carbitEnabled())
                         phoneMediaAudio = discoveryConfig.phoneMediaAudio
                         val response = AaServiceDiscovery.build(discoveryConfig)
                         logger.log("TX SERVICE_DISCOVERY_RESPONSE ${response.size}B (${AaServiceDiscovery.describe(discoveryConfig)})")
@@ -818,6 +884,7 @@ class AaSessionProbe(
                         // openauto's AndroidAutoEntity::onAudioFocusRequest(): release -> LOSS(3),
                         // anything else -> GAIN(1). AudioFocusNotification.focus_state = 1.
                         val requestType = AaProtobuf.parse(body).firstOrNull { it.number == 1 }?.varint
+                        voiceFocus = requestType == 2L
                         val focusState = if (requestType == 4L) 3 else 1
                         logger.log("RX AUDIO_FOCUS_REQUEST type=$requestType -> focus_state=$focusState")
                         val notification = AaProtobuf.Writer().int(1, focusState).build()
@@ -842,8 +909,10 @@ class AaSessionProbe(
             activeChannel = null
             cachedCodecConfig = null
             cachedKeyframe = null
-            micCapture?.stop()
-            micCapture = null
+            stopMicrophone()
+            speechPlayer?.stop()
+            speechPlayer = null
+            voiceFocus = false
             audioPlayer?.stop()
             audioPlayer = null
             carbitAudio?.stopPlayback()

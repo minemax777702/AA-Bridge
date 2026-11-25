@@ -164,6 +164,8 @@ object AppSettings {
             else -> AaFillMode.FIT
         }
 
+    fun carbitMicEnabled(context: Context): Boolean = prefs(context).getBoolean("aa_carbit_mic", false)
+
     fun aaAudioRoute(context: Context): AaAudioRoute =
         when (prefs(context).getString("aa_audio_route", "phone_direct")) {
             "device_only" -> AaAudioRoute.DEVICE_ONLY

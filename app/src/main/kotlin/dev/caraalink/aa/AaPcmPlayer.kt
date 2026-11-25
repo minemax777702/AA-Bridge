@@ -7,7 +7,11 @@ import android.media.AudioTrack
 import dev.caraalink.diagnostics.DiagnosticLogger
 
 /** Plays the 16 kHz mono PCM system stream negotiated in PHONE_DIRECT mode. */
-internal class AaPcmPlayer(context: Context, preview: Boolean) {
+internal class AaPcmPlayer(
+    context: Context,
+    preview: Boolean,
+    private val remotePcm: (ByteArray) -> Boolean = { false },
+) {
     private val logger = DiagnosticLogger(context, "aa-system-audio")
     private val route = AaOutputRoute(context, preview, logger)
     private var track: AudioTrack? = null
@@ -17,6 +21,10 @@ internal class AaPcmPlayer(context: Context, preview: Boolean) {
     fun feed(pcm: ByteArray) {
         if (closed || pcm.isEmpty() || pcm.size % 2 != 0) return
         runCatching {
+            if (remotePcm(pcm)) {
+                releaseTrack()
+                return
+            }
             val output = track ?: createTrack().also { track = it }
             route.refresh(output)
             val written = output.write(pcm, 0, pcm.size, AudioTrack.WRITE_BLOCKING)
@@ -52,6 +60,10 @@ internal class AaPcmPlayer(context: Context, preview: Boolean) {
     @Synchronized
     fun stop() {
         closed = true
+        releaseTrack()
+    }
+
+    private fun releaseTrack() {
         track?.let { output ->
             runCatching { output.stop() }
             runCatching { output.release() }

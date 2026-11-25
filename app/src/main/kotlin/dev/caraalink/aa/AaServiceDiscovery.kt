@@ -75,6 +75,7 @@ object AaServiceDiscovery {
     const val CODEC_VIDEO_H264_BP = 3
 
     /** `AudioStreamType` */
+    const val AUDIO_STREAM_SPEECH = 1
     const val AUDIO_STREAM_SYSTEM = 2
     const val AUDIO_STREAM_MEDIA = 3
 
@@ -89,6 +90,7 @@ object AaServiceDiscovery {
     /** Control-channel channel ids (`ChannelId.hpp`). */
     const val CHANNEL_MEDIA_SINK_VIDEO = 3
     const val CHANNEL_MEDIA_SINK_MEDIA_AUDIO = 4
+    const val CHANNEL_MEDIA_SINK_SPEECH_AUDIO = 5
     const val CHANNEL_SENSOR = 1
     const val CHANNEL_MEDIA_SOURCE_MICROPHONE = 9
     const val CHANNEL_MEDIA_PLAYBACK_STATUS = 13
@@ -120,6 +122,8 @@ object AaServiceDiscovery {
         val driverPosition: Int = DRIVER_POSITION_LEFT,
         /** Declare only the required system sink, so AA plays media and guidance on the phone itself. */
         val phoneMediaAudio: Boolean = false,
+        /** Extra speech sink only for opt-in CarbitLink audio sessions. */
+        val carbitSpeech: Boolean = false,
     )
 
     /**
@@ -435,6 +439,17 @@ object AaServiceDiscovery {
             .message(1, inputService)
             .message(1, sensorService)
             .message(1, microphoneService)
+        if (config.carbitSpeech && !config.phoneMediaAudio) {
+            // AA speech stream: navigation and assistant prompts (type 1).
+            val speechConfig = AaProtobuf.Writer().int(1, 16_000).int(2, 16).int(3, 1).build()
+            val speechSink = AaProtobuf.Writer()
+                .int(1, CODEC_AUDIO_PCM)
+                .int(2, AUDIO_STREAM_SPEECH)
+                .message(3, speechConfig).build()
+            builder.message(1, AaProtobuf.Writer()
+                .int(1, CHANNEL_MEDIA_SINK_SPEECH_AUDIO)
+                .message(3, speechSink).build())
+        }
         emptyServiceExtra.forEach { builder.message(1, it) }
         return builder.message(1, vendorService)
             .int(6, config.driverPosition)           // driver_position
