@@ -15,3 +15,4 @@ dependencyResolutionManagement {
 rootProject.name = "CarAALink"
 include(":app")
 include(":protocol")
+include(":hu-emulator")

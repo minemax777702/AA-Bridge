@@ -24,7 +24,7 @@ fun carToRetry(snapshot: ConnectionSnapshot, remembered: RememberedCar?): Rememb
 
 /** Opening the app connects to the remembered car, unless a cable or wireless attempt is already running. */
 fun shouldAutoConnect(snapshot: ConnectionSnapshot, hasRememberedCar: Boolean): Boolean =
-    hasRememberedCar && snapshot.link == CarLink.NONE && !snapshot.phase.isCarConnected() && snapshot.wireless in setOf(
+    hasRememberedCar && !snapshot.emulatorActive && snapshot.link == CarLink.NONE && !snapshot.phase.isCarConnected() && snapshot.wireless in setOf(
         WirelessPhase.IDLE, WirelessPhase.NOT_FOUND, WirelessPhase.FAILED, WirelessPhase.WIFI_OFF,
     )
 

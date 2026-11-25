@@ -78,9 +78,11 @@ class CarSession(
     }
 
     /** The same channels over the car's Wi-Fi Direct TCP connections; the car shows up on its first CLIENT_INFO. */
-    fun startWireless() {
-        features.start()
-        transport = SocketTransport(logger, channels(), ::onTransportClosed).also { it.start() }
+    internal fun startWireless(emulatorMode: Boolean = false, emulatorLan: EmulatorLanSession? = null) {
+        check(!emulatorMode || dev.caraalink.BuildConfig.DEBUG)
+        // The development emulator never receives real phone location.
+        if (!emulatorMode) features.start()
+        transport = SocketTransport(logger, channels(), ::onTransportClosed, emulatorMode, emulatorLan).also { it.start() }
     }
 
     private fun channels(): (String) -> AdbTransport.StreamHandler? {

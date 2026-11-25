@@ -55,6 +55,13 @@ class SettingsActivity : AppCompatActivity() {
         override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
             setPreferencesFromResource(dev.caraalink.R.xml.root_preferences, rootKey)
             updateDpiSummary()
+            findPreference<Preference>("start_hu_emulator")?.apply {
+                isVisible = dev.caraalink.BuildConfig.DEBUG
+                setOnPreferenceClickListener {
+                    HuEmulatorDialog.show(requireContext())
+                    true
+                }
+            }
 
             findPreference<Preference>("developer_tools")?.setOnPreferenceClickListener {
                 startActivity(Intent(requireContext(), dev.caraalink.diagnostics.DeveloperToolsActivity::class.java))

@@ -94,7 +94,7 @@ class UsbLinkForegroundService : Service() {
         }
         if (it.phase == ConnectionPhase.STREAMING) {
             handler.post { transportReconnectAttempts = 0 }
-            AppSettings.setCarConnectedOnce(this)
+            if (!it.emulatorActive) AppSettings.setCarConnectedOnce(this)
         }
     }
 
@@ -147,6 +147,7 @@ class UsbLinkForegroundService : Service() {
             ACTION_START_SESSION -> {
                 handleStart(intent) { accessory -> beginSession(accessory) }
             }
+            ACTION_START_EMULATOR -> if (dev.caraalink.BuildConfig.DEBUG) beginEmulator(intent)
             ACTION_START_WIRELESS -> {
                 val address = intent.getStringExtra(EXTRA_CAR_ADDRESS)
                 val target = address?.let { RememberedCar(intent.getStringExtra(EXTRA_CAR_NAME) ?: it, it) }
@@ -169,6 +170,12 @@ class UsbLinkForegroundService : Service() {
             return
         }
         Log.i(TAG, "handleStart: ${intent.action} with accessory=${accessory.manufacturer}/${accessory.model}")
+        if (ConnectionStateHolder.snapshot.emulatorActive) {
+            val old = session
+            session = null
+            old?.stop()
+            ConnectionStateHolder.update { it.copy(emulatorActive = false) }
+        }
         pendingAccessory = accessory
         // The cable wins: drop any wireless search before the cable session starts.
         closeWireless(disconnect = true)
@@ -275,6 +282,10 @@ class UsbLinkForegroundService : Service() {
         session?.stop()
         session = null
         ConnectionStateHolder.removeListener(stateListener)
+        if (ConnectionStateHolder.snapshot.emulatorActive) {
+            ConnectionStateHolder.update { it.copy(emulatorActive = false,
+                phase = ConnectionPhase.DISCONNECTED, carName = null) }
+        }
         detachStopRunnable?.let { handler.removeCallbacks(it) }
         detachStopRunnable = null
         runCatching { unregisterReceiver(detachReceiver) }
@@ -336,9 +347,57 @@ class UsbLinkForegroundService : Service() {
     private fun hasFineLocation() =
         checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED
 
+    /** Explicit debug session: ADB localhost or authenticated, Wi-Fi-bound LAN. */
+    private fun beginEmulator(intent: Intent) {
+        if (!dev.caraalink.BuildConfig.DEBUG || session != null || wirelessLink != null ||
+            pendingAccessory != null || sniffer != null || adbProbe != null) return
+        val requestedIp = intent.getStringExtra(EXTRA_EMULATOR_IP)
+        val lan = if (requestedIp != null) {
+            val endpoint = dev.caraalink.link.EmulatorWifi.current(this)
+            val key = intent.getStringExtra(EXTRA_EMULATOR_CODE)?.let(dev.caraalink.protocol.EmulatorLanAuth::parseCode)
+            if (endpoint == null || endpoint.address.hostAddress != requestedIp || key == null) {
+                // Reject stale or incomplete LAN configuration; do not widen the listener.
+                stopSelf()
+                return
+            }
+            dev.caraalink.link.EmulatorLanSession(endpoint, key)
+        } else null
+        try {
+            startForegroundWithMic()
+        } catch (e: SecurityException) {
+            phoneLog.log("HU emulator foreground start refused: $e")
+            stopSelf()
+            return
+        }
+        stopping = false
+        acquireWakeLock()
+        lateinit var s: CarSession
+        s = CarSession(this, null) { _ ->
+            handler.post {
+                if (session === s) {
+                    session = null
+                    stopSelfCleanly()
+                }
+            }
+        }
+        session = s
+        ConnectionStateHolder.update {
+            it.copy(link = CarLink.NONE, wireless = WirelessPhase.IDLE, emulatorActive = true,
+                phase = ConnectionPhase.DISCONNECTED, carName = null, lastError = null)
+        }
+        s.startWireless(emulatorMode = true, emulatorLan = lan)
+        handler.postDelayed({
+            if (session === s && ConnectionStateHolder.snapshot.phase != ConnectionPhase.STREAMING) {
+                phoneLog.log("HU emulator connection timeout")
+                stopSelfCleanly()
+            }
+        }, 120_000L)
+    }
+
     // --- wireless ---
 
     private fun beginWireless(target: RememberedCar?) {
+        if (ConnectionStateHolder.snapshot.emulatorActive) return
         // startForegroundService needs startForeground even when there turns out to be nothing to do.
         startForegroundWithMic(wireless = true)
         if (target == null || ConnectionStateHolder.snapshot.link == CarLink.CABLE) {
@@ -573,7 +632,9 @@ class UsbLinkForegroundService : Service() {
         // Searching phases end with the service; NOT_FOUND, FAILED and WIFI_OFF stay for Home.
         ConnectionStateHolder.update {
             val active = it.wireless == WirelessPhase.SEARCHING || it.wireless == WirelessPhase.CONNECTING || it.wireless == WirelessPhase.RECONNECTING
-            it.copy(link = CarLink.NONE, wireless = if (active) WirelessPhase.IDLE else it.wireless)
+            it.copy(link = CarLink.NONE, wireless = if (active) WirelessPhase.IDLE else it.wireless,
+                emulatorActive = false, phase = if (it.emulatorActive) ConnectionPhase.DISCONNECTED else it.phase,
+                carName = if (it.emulatorActive) null else it.carName)
         }
         sniffer?.stop()
         adbProbe?.stop()
@@ -675,6 +736,9 @@ class UsbLinkForegroundService : Service() {
         internal fun afterFailedAttempt(reconnectUntil: Long, now: Long): WirelessPhase? =
             if (now < reconnectUntil) null else WirelessPhase.FAILED
 
+        const val ACTION_START_EMULATOR = "dev.caraalink.service.action.START_EMULATOR"
+        const val EXTRA_EMULATOR_IP = "emulator_ip"
+        const val EXTRA_EMULATOR_CODE = "emulator_code"
         const val ACTION_START_WIRELESS = "dev.caraalink.service.action.START_WIRELESS"
         const val EXTRA_CAR_ADDRESS = "car_address"
         const val EXTRA_CAR_NAME = "car_name"
