@@ -4,7 +4,7 @@ package dev.caraalink.settings
 internal object HuWizardPlan {
     enum class Check { MUSIC, GUIDANCE, VOICE, TOUCH, PINCH }
     enum class Verdict { HU, PHONE, PASS, FAIL, SKIP }
-    data class Result(val profile: HuTestProfiles.Profile, val answers: Map<Check, Verdict>) {
+    data class Result(val profile: HuTestProfiles.Profile, val answers: Map<Check, Verdict>, val voicePath: String = "") {
         val checks get() = checksFor(profile)
         val answered get() = checks.count { it in answers }
         val passed get() = checks.count { successful(answers[it]) }
@@ -40,6 +40,7 @@ internal object HuWizardPlan {
         compareByDescending<Result> { it.confirmed }
             .thenByDescending { it.huAudio }
             .thenByDescending { it.answers[Check.PINCH] == Verdict.PASS }
+            .thenByDescending { it.answers[Check.VOICE] == Verdict.PASS && it.voicePath == "CARBIT_PCM" }
             .thenByDescending { it.passed }
             .thenBy { it.failed }
             .thenByDescending { it.complete }

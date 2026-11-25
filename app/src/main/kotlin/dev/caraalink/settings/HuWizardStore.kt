@@ -17,6 +17,7 @@ internal class HuWizardStore(context: Context) {
         val results: Map<String, Map<HuWizardPlan.Check, HuWizardPlan.Verdict>> = emptyMap(),
         val skipped: Set<String> = emptySet(),
         val summary: Boolean = false,
+        val voicePaths: Map<String, String> = emptyMap(),
     )
 
     fun load(): Run? = runCatching {
@@ -34,8 +35,12 @@ internal class HuWizardStore(context: Context) {
         }
         val skipped = json.optJSONArray("skipped")
         val skippedSet = (0 until (skipped?.length() ?: 0)).mapNotNull { skipped?.optString(it) }.toSet()
+        val paths = json.optJSONObject("voicePaths") ?: JSONObject()
+        val voicePaths = HuTestProfiles.all.mapNotNull { profile ->
+            paths.optString(profile.signature).takeIf { it.isNotBlank() }?.let { profile.signature to it }
+        }.toMap()
         Run(json.getString("target"), json.getString("label"), json.getString("original"),
-            json.optBoolean("originalCapture"), json.optString("selected"), results, skippedSet, json.optBoolean("summary"))
+            json.optBoolean("originalCapture"), json.optString("selected"), results, skippedSet, json.optBoolean("summary"), voicePaths)
     }.getOrNull()
 
     fun save(run: Run) {
@@ -45,7 +50,9 @@ internal class HuWizardStore(context: Context) {
             answers.forEach { (check, verdict) -> checks.put(check.name, verdict.name) }
             results.put(signature, checks)
         }
-        val json = JSONObject().put("target", run.target).put("label", run.label)
+        val voicePaths = JSONObject()
+        run.voicePaths.forEach { (signature, path) -> voicePaths.put(signature, path) }
+        val json = JSONObject().put("voicePaths", voicePaths).put("target", run.target).put("label", run.label)
             .put("original", run.originalSignature).put("originalCapture", run.originalCapture)
             .put("selected", run.selected).put("results", results)
             .put("skipped", org.json.JSONArray(run.skipped.toList())).put("summary", run.summary)

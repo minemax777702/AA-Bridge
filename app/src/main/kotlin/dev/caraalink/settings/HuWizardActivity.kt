@@ -122,7 +122,7 @@ private fun HuWizardScreen(onBack: () -> Unit) {
             } else {
                 val candidates = HuWizardPlan.candidates(evidence.musicDeclared, evidence.micDeclared)
                 val tested = current.results.mapNotNull { (signature, answers) ->
-                    HuTestProfiles.all.firstOrNull { it.signature == signature }?.let { HuWizardPlan.Result(it, answers) }
+                    HuTestProfiles.all.firstOrNull { it.signature == signature }?.let { HuWizardPlan.Result(it, answers, current.voicePaths[signature].orEmpty()) }
                 }
                 val finished = tested.count { it.complete }
                 val progress = (finished + current.skipped.size).coerceAtMost(candidates.size)
@@ -148,6 +148,7 @@ private fun HuWizardScreen(onBack: () -> Unit) {
                             Text(profileName(best.profile), style = MaterialTheme.typography.titleMedium)
                             Text(stringResource(R.string.hu_wizard_audio_hu_count, best.huAudio))
                             if (best.profile.gestures == "SINGLE") Text(stringResource(R.string.hu_wizard_single_limit), color = Dash.Amber)
+                            if (best.voicePath.isNotBlank()) Text(stringResource(R.string.hu_wizard_mic_path, best.voicePath))
                             if (best.huAudio < 2) Text(stringResource(R.string.hu_wizard_phone_limit), color = Dash.Amber)
                             Button(enabled = disconnected && parked, modifier = Modifier.fillMaxWidth(), onClick = {
                                 if (restore(current, best.profile.signature)) {
@@ -165,6 +166,7 @@ private fun HuWizardScreen(onBack: () -> Unit) {
                             Text(profileName(result.profile))
                             Text(stringResource(R.string.hu_wizard_result, result.passed, result.checks.size, result.failed, result.huAudio),
                                 color = if (result.confirmed) Dash.Teal else Dash.Muted, style = MaterialTheme.typography.bodySmall)
+                            if (result.voicePath.isNotBlank()) Text(stringResource(R.string.hu_wizard_mic_path, result.voicePath), style = MaterialTheme.typography.bodySmall)
                             result.checks.forEach { check ->
                                 val verdict = result.answers[check]
                                 Text(stringResource(checkLabel(check)) + ": " + stringResource(verdict?.let(::verdictLabel) ?: R.string.hu_unknown),
@@ -214,6 +216,10 @@ private fun HuWizardScreen(onBack: () -> Unit) {
                                 if (evidence.playbackAck) Text(stringResource(R.string.hu_audio_ack), style = MaterialTheme.typography.bodySmall)
                                 if (evidence.micPcm) Text(stringResource(R.string.hu_mic_pcm), style = MaterialTheme.typography.bodySmall)
                                 if (evidence.multiTouch) Text(stringResource(R.string.hu_multitouch_observed), style = MaterialTheme.typography.bodySmall)
+                                evidence.outputDeviceType?.let { Text(stringResource(R.string.hu_wizard_output_type, it), style = MaterialTheme.typography.bodySmall) }
+                                if (evidence.micPath.isNotBlank()) Text(stringResource(R.string.hu_wizard_mic_path, evidence.micPath), style = MaterialTheme.typography.bodySmall)
+                                evidence.micPeak?.let { Text(stringResource(R.string.hu_wizard_mic_peak, it), style = MaterialTheme.typography.bodySmall) }
+                                if (evidence.micSilenced == true) Text(stringResource(R.string.hu_wizard_mic_silenced), color = Dash.Amber)
                             }
                             Text(stringResource(R.string.hu_wizard_test_count, answers.size, checks.size))
                             if (next != null) {
@@ -228,15 +234,17 @@ private fun HuWizardScreen(onBack: () -> Unit) {
                                             ConnectionStateHolder.snapshot.phase != ConnectionPhase.STREAMING ||
                                             AppSettings.huProfileSignature(context) != selected.signature) return@OutlinedButton
                                         val updated = answers + (next to verdict)
-                                        save(current.copy(results = current.results + (selected.signature to updated)))
-                                        logger.log("Wizard test ${selected.signature} ${next.name}=${verdict.name}; playbackAck=${live.playbackAck} micPcm=${live.micPcm} multiTouch=${live.multiTouch}")
+                                        val paths = if (next == HuWizardPlan.Check.VOICE)
+                                            current.voicePaths + (selected.signature to live.micPath) else current.voicePaths
+                                        save(current.copy(results = current.results + (selected.signature to updated), voicePaths = paths))
+                                        logger.log("Wizard test ${selected.signature} ${next.name}=${verdict.name}; playbackAck=${live.playbackAck} micPcm=${live.micPcm} multiTouch=${live.multiTouch} micPath=${live.micPath} outputDevice=${live.outputDeviceType}")
                                     }) { Text(stringResource(verdictLabel(verdict))) }
                                 }
                             } else {
                                 Text(stringResource(R.string.hu_wizard_profile_done), color = Dash.Teal)
                             }
                             if (answers.isNotEmpty()) TextButton(onClick = {
-                                save(current.copy(results = current.results - selected.signature))
+                                save(current.copy(results = current.results - selected.signature, voicePaths = current.voicePaths - selected.signature))
                             }) { Text(stringResource(R.string.hu_wizard_retest)) }
                             OutlinedButton(modifier = Modifier.fillMaxWidth(), onClick = {
                                 val skipped = if (answers.isEmpty()) current.skipped + selected.signature else current.skipped
@@ -261,7 +269,7 @@ private fun HuWizardScreen(onBack: () -> Unit) {
                     exporting = true; exportError = false
                     scope.launch {
                         try {
-                            logger.log("Wizard report: target=${current.target}; tested=${current.results}; skipped=${current.skipped}")
+                            logger.log("Wizard report: target=${current.target}; tested=${current.results}; micPaths=${current.voicePaths}; skipped=${current.skipped}")
                             val intent = withContext(Dispatchers.IO) { logger.shareAllLogsIntent() }
                             context.startActivity(Intent.createChooser(intent, null))
                         } catch (_: Exception) { exportError = true }

@@ -46,4 +46,8 @@
     <string name="hu_wizard_pinch_hint">На карте с поддержкой масштабирования сведите и разведите два пальца. Проверьте отсутствие ложных касаний.</string>
     <string name="hu_wizard_heard_hu">Хорошо слышно через ГУ</string>
     <string name="hu_wizard_heard_phone">Хорошо слышно через телефон</string>
+    <string name="hu_wizard_mic_path">Обнаруженный маршрут микрофона: %1$s</string>
+    <string name="hu_wizard_output_type">Тип устройства вывода Android: %1$d</string>
+    <string name="hu_wizard_mic_peak">Пиковый уровень микрофона: %1$d / 32768</string>
+    <string name="hu_wizard_mic_silenced">Android сообщает о блокировке микрофона</string>
 </resources>

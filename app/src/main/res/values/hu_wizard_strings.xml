@@ -46,4 +46,8 @@
     <string name="hu_wizard_pinch_hint">In a map supporting zoom, use two fingers. Check that zoom works without phantom taps.</string>
     <string name="hu_wizard_heard_hu">Heard clearly on head unit</string>
     <string name="hu_wizard_heard_phone">Heard clearly on phone</string>
+    <string name="hu_wizard_mic_path">Observed microphone path: %1$s</string>
+    <string name="hu_wizard_output_type">Android output device type: %1$d</string>
+    <string name="hu_wizard_mic_peak">Microphone peak: %1$d / 32768</string>
+    <string name="hu_wizard_mic_silenced">Android reports microphone is silenced</string>
 </resources>

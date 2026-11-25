@@ -14,6 +14,10 @@ internal object HuCompatibility {
         val connected: Boolean = false,
         val sessionId: String = "",
         val musicDeclared: Boolean? = null,
+        val outputDeviceType: Int? = null,
+        val micPath: String = "",
+        val micPeak: Int? = null,
+        val micSilenced: Boolean? = null,
         val appliedProfile: String = "",
         val name: String = "",
         val screen: String = "",
@@ -51,6 +55,17 @@ internal object HuCompatibility {
     @Synchronized fun multiTouch(token: Any) {
         if (owner === token && !mutable.value.multiTouch) mutable.value = mutable.value.copy(multiTouch = true)
     }
+    @Synchronized fun output(sessionId: String, type: Int?) {
+        val e = mutable.value
+        if (e.connected && e.sessionId == sessionId && type != null && e.outputDeviceType != type)
+            mutable.value = e.copy(outputDeviceType = type)
+    }
+    @Synchronized fun microphone(sessionId: String, path: String, peak: Int? = null, silenced: Boolean? = null) {
+        val e = mutable.value
+        if (e.connected && e.sessionId == sessionId)
+            mutable.value = e.copy(micPath = path, micPeak = peak, micSilenced = silenced)
+    }
+
     private val vehicleName = Regex("park|brake|gear|selector|speed|velocity|ignition|rpm|engine|odometer|fuel|battery|seatbelt|door|vehicle|canbus|reverse|steer|turnsignal|temperature|handbrake", RegexOption.IGNORE_CASE)
     private val privateName = Regex("token|password|secret|serial|uuid|huid|vin|mac|address|latitude|longitude|location|phone|account|ssid|imei|imsi|auth", RegexOption.IGNORE_CASE)
 

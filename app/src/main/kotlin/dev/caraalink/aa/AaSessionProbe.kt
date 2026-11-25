@@ -812,6 +812,10 @@ class AaSessionProbe(
                         logger.log("RX MICROPHONE_REQUEST open=$open")
                         stopMicrophone()
                         voiceRequested = open
+                        if (open && !config.preview) {
+                            val hu = dev.caraalink.diagnostics.HuCompatibility
+                            hu.microphone(hu.state.value.sessionId, "UNKNOWN")
+                        }
                         val micChannel = message.channelId
                         val sendMic: (ByteArray) -> Unit = { pcm ->
                             // No capture or forwarding after close/shutdown or on a stale channel.
