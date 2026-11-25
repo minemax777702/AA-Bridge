@@ -150,6 +150,10 @@ object AppSettings {
     fun parkingMode(context: Context): Boolean =
         dev.caraalink.BuildConfig.DEBUG && prefs(context).getBoolean(PARKING_MODE_KEY, true)
 
+    internal const val PHONE_GPS_SPEED_KEY = "phone_gps_speed"
+
+    fun phoneGpsSpeed(context: Context): Boolean = prefs(context).getBoolean(PHONE_GPS_SPEED_KEY, false)
+
     fun carbitMicEnabled(context: Context): Boolean = prefs(context).getBoolean("aa_carbit_mic", false)
 
     fun aaAudioRoute(context: Context): AaAudioRoute =

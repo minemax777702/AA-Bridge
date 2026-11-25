@@ -38,4 +38,8 @@
     <string name="pref_parking_mode_title">Режим парковки</string>
     <string name="pref_parking_mode_test">Только для тестового стенда</string>
     <string name="pref_parking_mode_unavailable">Нет данных о парковке</string>
+    <string name="pref_phone_gps_speed_title">Скорость по GPS телефона</string>
+    <string name="pref_phone_gps_speed_summary">Использовать актуальную скорость GPS для CarbitLink и диагностики. После изменения переподключитесь.</string>
+    <string name="diag_gps_speed_unavailable">Скорость GPS: нет данных</string>
+    <string name="diag_gps_speed">Скорость GPS: %1$.1f км/ч</string>
 </resources>

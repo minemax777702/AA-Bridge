@@ -38,4 +38,8 @@
     <string name="pref_parking_mode_title">Parking mode</string>
     <string name="pref_parking_mode_test">Stationary test bench only</string>
     <string name="pref_parking_mode_unavailable">Parking data unavailable</string>
+    <string name="pref_phone_gps_speed_title">Phone GPS speed</string>
+    <string name="pref_phone_gps_speed_summary">Use fresh GPS velocity for CarbitLink and diagnostics. Reconnect after changing.</string>
+    <string name="diag_gps_speed_unavailable">GPS speed: unavailable</string>
+    <string name="diag_gps_speed">GPS speed: %1$.1f km/h</string>
 </resources>

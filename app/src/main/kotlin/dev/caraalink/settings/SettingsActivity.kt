@@ -5,6 +5,8 @@ import android.content.SharedPreferences
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -78,6 +80,9 @@ private fun AdvancedSettings(onBack: () -> Unit) {
     val custom = string("video_resolution_mode", "auto") == "custom"
     val autoDpi = bool("video_dpi_auto", true)
     val carbitAudio = string("aa_audio_route", "phone_direct") == "carbit_experimental"
+    val gpsPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
+        setBool(AppSettings.PHONE_GPS_SPEED_KEY, result[android.Manifest.permission.ACCESS_FINE_LOCATION] == true)
+    }
     val connection = rememberConnection()
     val parkingAvailable = BuildConfig.DEBUG && connection.link == CarLink.NONE
     val density = remember(revision) { AaServiceDiscovery.configFromSettings(context).density }
@@ -133,6 +138,12 @@ private fun AdvancedSettings(onBack: () -> Unit) {
             }
         }
         SettingsSection(R.string.pref_category_android_auto_title) {
+            ToggleSetting(stringResource(R.string.pref_phone_gps_speed_title),
+                stringResource(R.string.pref_phone_gps_speed_summary), bool(AppSettings.PHONE_GPS_SPEED_KEY, false)) { enabled ->
+                if (enabled && context.checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                    gpsPermission.launch(arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION, android.Manifest.permission.ACCESS_COARSE_LOCATION))
+                } else setBool(AppSettings.PHONE_GPS_SPEED_KEY, enabled)
+            }
             ToggleSetting(stringResource(R.string.pref_parking_mode_title),
                 stringResource(if (parkingAvailable) R.string.pref_parking_mode_test else R.string.pref_parking_mode_unavailable),
                 parkingAvailable && bool(AppSettings.PARKING_MODE_KEY, true), enabled = parkingAvailable) {

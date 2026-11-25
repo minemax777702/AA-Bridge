@@ -39,6 +39,9 @@ data class ConnectionSnapshot(
     val target: RememberedCar? = null,
     /** Debug emulator session (including the waiting phase); never a real car. */
     val emulatorActive: Boolean = false,
+    /** GPS velocity is diagnostic data, not vehicle parking state. */
+    val phoneGpsSpeedMps: Float? = null,
+    val phoneGpsSpeedElapsedNanos: Long = 0L,
 )
 
 /**
