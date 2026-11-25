@@ -1,89 +1,113 @@
 <p align="center">
-  <img src="docs/logo.svg" alt="AA Bridge" width="480" />
+  <img src="docs/logo.svg" alt="AndroidAuto Bridge" width="480" />
 </p>
 
-AndroidAuto Bridge is an independent fork of [AA-Bridge](https://github.com/alimorgaan/AA-Bridge). It brings Android Auto to cars whose screen only supports CarbitLink (also called EasyConnection) or QDLink phone mirroring.
+<p align="center">Русский · <a href="README.en.md">English</a></p>
 
-The app runs on your phone. It starts a local Android Auto session and sends it to the car, over a USB cable or wirelessly over Wi-Fi Direct. Touches on the car screen go back to Android Auto.
+AndroidAuto Bridge — независимый форк проекта [AA-Bridge](https://github.com/alimorgaan/AA-Bridge). Приложение позволяет использовать Android Auto в автомобилях, мультимедийная система которых поддерживает только трансляцию экрана телефона через CarbitLink (также известный как EasyConnection) или QDLink.
+
+Приложение работает на телефоне: запускает локальный сеанс Android Auto и передаёт изображение на экран автомобиля по USB-кабелю или беспроводному соединению Wi-Fi Direct. Касания экрана автомобиля передаются обратно в Android Auto.
 
 <p align="center">
-  <img src="docs/screenshots/android-auto-starting.webp" alt="Android Auto starting on the screen of a 2026 Geely Emgrand" width="640" />
+  <img src="docs/screenshots/android-auto-starting.webp" alt="Запуск Android Auto на экране Geely Emgrand 2026 года" width="640" />
 </p>
 
-## Screenshots
+## Скриншоты
 
 <p align="center">
-  <img src="docs/screenshots/home-searching.png" alt="AA Bridge looking for the car" height="440" />
-  <img src="docs/screenshots/nearby-cars.jpg" alt="Choosing the car from the Nearby cars list, with the car screen on its phone-link page" height="440" />
-  <img src="docs/screenshots/home-connected.jpg" alt="AA Bridge connected, with Android Auto on the car screen" height="440" />
+  <img src="docs/screenshots/home-searching.png" alt="Поиск автомобиля" height="440" />
+  <img src="docs/screenshots/nearby-cars.jpg" alt="Выбор автомобиля из списка устройств поблизости, на экране автомобиля открыт раздел подключения телефона" height="440" />
+  <img src="docs/screenshots/home-connected.jpg" alt="Автомобиль подключён, Android Auto работает на его экране" height="440" />
 </p>
 <p align="center">
-  <img src="docs/screenshots/car-screen.jpg" alt="Android Auto with Google Maps and media on the car screen" width="640" />
+  <img src="docs/screenshots/car-screen.jpg" alt="Android Auto с Google Картами и медиаплеером на экране автомобиля" width="640" />
 </p>
-<p align="center"><sub>2026 Geely Emgrand (head unit EC-KY-4350), connected wirelessly.</sub></p>
+<p align="center"><sub>Geely Emgrand 2026 года (головное устройство EC-KY-4350), беспроводное подключение. Скриншоты из исходного проекта.</sub></p>
 
-## Will it work in my car?
+## Совместимость с автомобилями
 
-- **Tested:** 2026 Geely Emgrand (Egypt, head unit EC-KY-4350), over cable and wireless. One other CarbitLink head unit over cable. A 2026 Geely Emgrand with QDLink over cable.
-- **Likely to work:** cars from Geely, Chery, Jetour, BAIC, JAC, GAC and Proton whose screen has CarbitLink, EasyConnection or a "phone link" app. This list comes from adapter listings and owner guides, not from our own tests.
-- **Tried it in your car?** Open an [issue](../../issues) with the car model and year, the name of the phone-link app on the car screen, cable or wireless, and whether it worked.
+- **Проверено в исходном проекте:** Geely Emgrand 2026 года (Египет, головное устройство EC-KY-4350) — по кабелю и без проводов; ещё одно головное устройство с CarbitLink — по кабелю; Geely Emgrand 2026 года с QDLink — по кабелю.
+- **Предположительно совместимо:** автомобили Geely, Chery, Jetour, BAIC, JAC, GAC и Proton, мультимедийные системы которых оснащены CarbitLink, EasyConnection или приложением для подключения телефона. Список основан на описаниях адаптеров и руководствах владельцев; совместимость этих моделей не подтверждена собственными тестами.
+- **Проверили на своём автомобиле?** Создайте [Issue](../../issues), указав модель и год выпуска автомобиля, название приложения для подключения телефона на головном устройстве, тип подключения (кабель или беспроводное) и результат проверки.
 
-## What you need
+## Требования
 
-- An Android 10 or newer phone with Android Auto
-- A car whose screen has CarbitLink, EasyConnection or QDLink
-- A USB data cable, or Wi-Fi turned on for wireless
+- Смартфон с Android 10 или новее и установленным Android Auto.
+- Автомобиль с поддержкой CarbitLink, EasyConnection или QDLink.
+- USB-кабель с поддержкой передачи данных либо включённый Wi-Fi для беспроводного подключения.
 
-## Download
+## Скачать
 
-Build the APK locally or use the GitHub Actions build artifacts. The app has no built-in update checker, download client, donation prompts or external website links.
+APK можно скачать в разделе [Releases](https://github.com/minemax777702/AA-Bridge/releases), собрать самостоятельно или получить из артефактов [GitHub Actions](https://github.com/minemax777702/AA-Bridge/actions).
 
-## Setup
+[**AndroidAuto Bridge 1.4.0**](https://github.com/minemax777702/AA-Bridge/releases/tag/v1.4.0) — предварительная сборка с русской локализацией. Вместе с APK опубликован файл `SHA256SUMS.txt` для проверки целостности.
 
-The app walks you through this the first time:
+> APK предварительной версии подписан отладочным ключом CI. Обновление ранее установленного приложения возможно только при совпадении подписи. Проверка на реальном автомобиле необходима.
 
-1. Allow notifications, location and the microphone.
-2. Turn on Android Auto developer mode: open Android Auto settings and tap Version 10 times.
-3. Start Android Auto's server: tap ⋮, then Start head unit server.
-4. Connect to your car:
-   - **Cable:** plug the phone into the car's USB port, then choose AA Bridge and Always.
-   - **Wireless:** tap Connect without a cable, then tap your car. Keep the car screen on the phone-link page.
+В приложении отсутствуют встроенная проверка обновлений, загрузчик APK, запросы пожертвований и ссылки на внешние сайты.
 
-## Every drive
+## Первоначальная настройка
 
-- **Cable:** plug in. Android Auto opens on the car screen by itself.
-- **Wireless:** open AA Bridge. It finds your car and connects. You can close the app after that.
+При первом запуске приложение предложит выполнить следующие действия:
 
-Plugging in the cable while connected wirelessly switches over without restarting Android Auto. Music, navigation voice and calls play through the phone's Bluetooth to the car, so keep the phone paired with the car.
+1. Разрешите уведомления, доступ к местоположению и микрофону.
+2. Включите режим разработчика Android Auto: откройте настройки Android Auto и нажмите на пункт «Версия» 10 раз.
+3. Запустите сервер головного устройства: нажмите ⋮ и выберите «Запустить сервер головного устройства» (Start head unit server).
+4. Подключитесь к автомобилю:
+   - **По кабелю:** подключите телефон к USB-порту автомобиля, выберите AndroidAuto Bridge и нажмите «Всегда».
+   - **Без проводов:** нажмите «Подключиться без кабеля», затем выберите свой автомобиль. На экране автомобиля должен быть открыт раздел подключения телефона.
 
-## If something goes wrong
+## Использование в поездках
 
-- **"Android Auto needs a tap":** Android Auto's server stops when the phone restarts. Tap the notification, then ⋮ and Start head unit server.
-- **Stuck on "Starting…":** go to Settings → Apps → Android Auto → Force stop, then start the server again.
-- **The QDLink app opens instead:** go to Settings → Apps → QDLink → Open by default, clear it, then plug in again and choose AA Bridge.
-- **Can't find your car:** make sure the car screen is on and showing the phone-link page, Wi-Fi is on, and the phone is close by.
+- **По кабелю:** подключите телефон. Android Auto автоматически появится на экране автомобиля.
+- **Без проводов:** откройте AndroidAuto Bridge. Приложение найдёт автомобиль и подключится к нему. После этого приложение можно закрыть.
 
-## Known limits
+Подключение USB-кабеля во время беспроводного сеанса переключает соединение без перезапуска Android Auto. Музыка, голосовые подсказки навигации и звонки воспроизводятся через Bluetooth телефона и аудиосистему автомобиля, поэтому оставляйте телефон сопряжённым с автомобилем.
 
-- Android Auto's developer mode is not an official feature, so an Android Auto update can break it.
-- QDLink cars work over cable only.
+## Решение проблем
 
-## Building
+- **«Требуется запуск Android Auto»:** сервер Android Auto останавливается после перезагрузки телефона. Нажмите на уведомление, затем ⋮ и выберите запуск сервера головного устройства (Start head unit server).
+- **Зависание на экране «Запуск Android Auto…»:** откройте Настройки → Приложения → Android Auto → Остановить принудительно, затем снова запустите сервер.
+- **Вместо AndroidAuto Bridge открывается QDLink:** откройте Настройки → Приложения → QDLink → Открывать по умолчанию, сбросьте настройки по умолчанию, затем повторно подключите кабель и выберите AndroidAuto Bridge.
+- **Автомобиль не найден:** убедитесь, что экран автомобиля включён и открыт раздел подключения телефона, Wi-Fi включён, а телефон находится рядом.
 
-Needs JDK 17 and the Android SDK.
+## Известные ограничения
+
+- Использование режима разработчика Android Auto для такого подключения официально не поддерживается, поэтому очередное обновление Android Auto может нарушить работу приложения.
+- Автомобили с QDLink поддерживают подключение только по кабелю.
+
+## Сборка проекта
+
+Для сборки необходимы JDK 17 и Android SDK.
+
+Linux / macOS:
 
 ```bash
 ./gradlew assembleDebug
 ```
 
-Release builds are signed only when `keystore.properties` (storeFile, storePassword, keyAlias, keyPassword) is in the project root. It is gitignored.
+Windows:
 
-## Credits
+```powershell
+.\gradlew.bat assembleDebug
+```
 
-Based on [AA-Bridge](https://github.com/alimorgaan/AA-Bridge) by alimorgaan, itself based on [CarAALink](https://github.com/JObersi10/CarAALink) by JObersi10. The Android Auto head unit certificate comes from aasdk, see [PROVENANCE.md](app/src/main/assets/aa/PROVENANCE.md).
+Готовый APK находится в `app/build/outputs/apk/debug/app-debug.apk`.
 
-## License
+Для запуска модульных тестов:
 
-GPL-3.0, see [LICENSE](LICENSE).
+```bash
+./gradlew testDebugUnitTest
+```
 
-Android Auto is a trademark of Google LLC. AA Bridge is not affiliated with Google or the makers of CarbitLink or QDLink.
+Релизные сборки подписываются только при наличии файла `keystore.properties` в корне проекта с параметрами `storeFile`, `storePassword`, `keyAlias` и `keyPassword`. Этот файл исключён из Git.
+
+## Авторы и благодарности
+
+Проект основан на [AA-Bridge](https://github.com/alimorgaan/AA-Bridge) от alimorgaan, который, в свою очередь, основан на [CarAALink](https://github.com/JObersi10/CarAALink) от JObersi10. Сертификат головного устройства Android Auto получен из проекта aasdk — подробнее в [PROVENANCE.md](app/src/main/assets/aa/PROVENANCE.md).
+
+## Лицензия
+
+GPL-3.0, см. [LICENSE](LICENSE).
+
+Android Auto является товарным знаком Google LLC. AndroidAuto Bridge не связан с Google или разработчиками CarbitLink и QDLink.
