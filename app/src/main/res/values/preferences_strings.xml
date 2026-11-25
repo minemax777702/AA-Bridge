@@ -35,4 +35,7 @@
     <string name="pref_developer_tools_summary">Log export, Car Preview</string>
     <string name="pref_aa_carbit_mic_title">CarbitLink car microphone (experimental)</string>
     <string name="pref_aa_carbit_mic_summary">Only in CarbitLink audio mode. Uses the car mic during Android Auto voice requests when supported, otherwise the phone or Bluetooth.</string>
+    <string name="pref_parking_mode_title">Parking mode</string>
+    <string name="pref_parking_mode_test">Stationary test bench only</string>
+    <string name="pref_parking_mode_unavailable">Parking data unavailable</string>
 </resources>

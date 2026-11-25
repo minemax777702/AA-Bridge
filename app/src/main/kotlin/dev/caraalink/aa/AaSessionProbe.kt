@@ -79,10 +79,11 @@ class AaSessionProbe(
 
     internal val isLanTestBench: Boolean = dev.caraalink.BuildConfig.DEBUG && config.lanTestBench
 
-    private fun stationaryBenchActive(): Boolean = isLanTestBench &&
-        dev.caraalink.connection.ConnectionStateHolder.snapshot.let {
-            it.emulatorActive && it.link == dev.caraalink.connection.CarLink.NONE
-        }
+    private fun stationaryBenchActive(): Boolean = StationaryBenchPolicy.canReportStationary(
+        isLanTestBench = isLanTestBench,
+        enabled = dev.caraalink.settings.AppSettings.parkingMode(context),
+        snapshot = dev.caraalink.connection.ConnectionStateHolder.snapshot,
+    )
 
     private val logger = DiagnosticLogger(context, "aa-session")
     private val running = AtomicBoolean(false)

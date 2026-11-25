@@ -26,6 +26,8 @@ import dev.caraalink.R
 import dev.caraalink.aa.AaReconnectBus
 import dev.caraalink.aa.AaServiceDiscovery
 import dev.caraalink.diagnostics.DeveloperToolsActivity
+import dev.caraalink.connection.CarLink
+import dev.caraalink.ui.rememberConnection
 import dev.caraalink.ui.SubScreen
 import dev.caraalink.ui.theme.AaBridgeTheme
 import dev.caraalink.ui.theme.Dash
@@ -41,7 +43,7 @@ class SettingsActivity : ComponentActivity() {
 private val reconnectKeys = setOf(
     "car_orientation", "video_resolution_mode", "video_resolution_custom_width", "video_resolution_custom_height",
     "video_frame_rate", "video_dpi_auto", "video_dpi_manual", "aa_auto_crop", "video_downscale_720p",
-    "aa_audio_route", "aa_carbit_mic", "aa_fill_mode",
+    "aa_audio_route", "aa_carbit_mic", "aa_fill_mode", AppSettings.PARKING_MODE_KEY,
 )
 
 @Composable
@@ -76,6 +78,8 @@ private fun AdvancedSettings(onBack: () -> Unit) {
     val custom = string("video_resolution_mode", "auto") == "custom"
     val autoDpi = bool("video_dpi_auto", true)
     val carbitAudio = string("aa_audio_route", "phone_direct") == "carbit_experimental"
+    val connection = rememberConnection()
+    val parkingAvailable = BuildConfig.DEBUG && connection.link == CarLink.NONE
     val density = remember(revision) { AaServiceDiscovery.configFromSettings(context).density }
 
     SubScreen(stringResource(R.string.settings_advanced), onBack) {
@@ -129,6 +133,11 @@ private fun AdvancedSettings(onBack: () -> Unit) {
             }
         }
         SettingsSection(R.string.pref_category_android_auto_title) {
+            ToggleSetting(stringResource(R.string.pref_parking_mode_title),
+                stringResource(if (parkingAvailable) R.string.pref_parking_mode_test else R.string.pref_parking_mode_unavailable),
+                parkingAvailable && bool(AppSettings.PARKING_MODE_KEY, true), enabled = parkingAvailable) {
+                setBool(AppSettings.PARKING_MODE_KEY, it)
+            }
             ProfileSetting(onLoaded = { reconnect() })
         }
         SettingsSection(R.string.pref_category_debug_title) {
@@ -176,11 +185,11 @@ private fun SettingRow(title: String, summary: String? = null, onClick: () -> Un
 }
 
 @Composable
-private fun ToggleSetting(title: String, summary: String, checked: Boolean, change: (Boolean) -> Unit) {
+private fun ToggleSetting(title: String, summary: String, checked: Boolean, enabled: Boolean = true, change: (Boolean) -> Unit) {
     ListItem(
         headlineContent = { Text(title) },
         supportingContent = { Text(summary, color = Dash.Muted) },
-        trailingContent = { Switch(checked = checked, onCheckedChange = change) },
+        trailingContent = { Switch(checked = checked, onCheckedChange = change, enabled = enabled) },
         colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
     )
 }

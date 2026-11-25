@@ -35,4 +35,7 @@
     <string name="pref_developer_tools_summary">Экспорт журналов, предпросмотр экрана автомобиля</string>
     <string name="pref_aa_carbit_mic_title">Микрофон автомобиля через CarbitLink (экспериментально)</string>
     <string name="pref_aa_carbit_mic_summary">Только в режиме звука CarbitLink. Использует микрофон автомобиля по запросу Android Auto, если он поддерживается, иначе микрофон телефона или Bluetooth.</string>
+    <string name="pref_parking_mode_title">Режим парковки</string>
+    <string name="pref_parking_mode_test">Только для тестового стенда</string>
+    <string name="pref_parking_mode_unavailable">Нет данных о парковке</string>
 </resources>

@@ -144,6 +144,12 @@ object AppSettings {
             else -> AaFillMode.FIT
         }
 
+    /** Existing stationary LAN simulation remains enabled by default in debug builds only. */
+    internal const val PARKING_MODE_KEY = "aa_parking_mode"
+
+    fun parkingMode(context: Context): Boolean =
+        dev.caraalink.BuildConfig.DEBUG && prefs(context).getBoolean(PARKING_MODE_KEY, true)
+
     fun carbitMicEnabled(context: Context): Boolean = prefs(context).getBoolean("aa_carbit_mic", false)
 
     fun aaAudioRoute(context: Context): AaAudioRoute =
