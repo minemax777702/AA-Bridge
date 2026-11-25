@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pref_category_video_title">Видео</string>
+    <string name="pref_car_orientation_title">Ориентация экрана автомобиля</string>
+    <string name="pref_car_orientation_summary">Определяется автоматически по головному устройству; меняйте только при ошибке</string>
+    <string name="pref_video_resolution_mode_title">Разрешение</string>
+    <string name="pref_video_resolution_mode_summary">Использовать разрешение головного устройства или задать размер вручную</string>
+    <string name="pref_video_resolution_custom_width_title">Ширина вручную (пикс.)</string>
+    <string name="pref_video_resolution_custom_height_title">Высота вручную (пикс.)</string>
+    <string name="pref_video_frame_rate_title">Частота кадров</string>
+    <string name="pref_video_bitrate_kbps_title">Битрейт видео (кбит/с)</string>
+    <string name="pref_video_dpi_auto_title">Автоопределение DPI</string>
+    <string name="pref_video_dpi_auto_summary">Использовать плотность экрана телефона для сеанса Android Auto</string>
+    <string name="pref_video_dpi_manual_title">DPI вручную</string>
+    <string name="pref_video_dpi_manual_summary">Используется только при отключённом автоопределении</string>
+    <string name="pref_category_audio_title">Аудио</string>
+    <string name="pref_audio_sample_rate_title">Частота дискретизации</string>
+    <string name="pref_audio_stereo_title">Стерео</string>
+    <string name="pref_category_android_auto_title">Android Auto</string>
+    <string name="pref_car_profiles_title">Профили автомобилей</string>
+    <string name="pref_car_profiles_summary">Сохранение и загрузка настроек видео и Android Auto для каждого автомобиля (ориентация, разрешение, заполнение и т. д.)</string>
+    <string name="pref_video_downscale_720p_title">Снижение разрешения</string>
+    <string name="pref_video_downscale_720p_summary">Передавать Android Auto кадры 720p вместо 1080p: при том же адаптивном битрейте меньше пикселей и артефактов. Не зависит от настройки разрешения вручную.</string>
+    <string name="pref_aa_fill_mode_title">Заполнение экрана автомобиля</string>
+    <string name="pref_aa_fill_mode_summary">Android Auto не поддерживает разрешение с такими пропорциями экрана, поэтому необходимо выбрать один из этих режимов</string>
+    <string name="pref_aa_audio_route_title">Микрофон и динамик Android Auto</string>
+    <string name="pref_aa_audio_route_summary">Устройство для передачи и воспроизведения голосовых команд и медиа Android Auto</string>
+    <string name="pref_aa_auto_crop_title">Автоматическая обрезка по форме экрана</string>
+    <string name="pref_aa_auto_crop_summary">Автоматически рассчитывать обрезку видео по фактическому размеру экрана автомобиля вместо обычных чёрных полос. Отключите, если изображение выглядит хуже.</string>
+    <string name="pref_category_connection_title">Подключение</string>
+    <string name="pref_auto_reconnect_usb_title">Автоподключение</string>
+    <string name="pref_auto_reconnect_usb_summary">Автоматически восстанавливать USB-подключение при обрыве</string>
+    <string name="pref_usb_role_override_title">Роль USB (отладка)</string>
+    <string name="pref_usb_role_override_summary">Подтверждено: телефон — USB-аксессуар, головное устройство — хост. Меняйте только для тестирования.</string>
+    <string name="pref_category_debug_title">Отладка</string>
+    <string name="pref_debug_verbose_logging_title">Перехват протокола</string>
+    <string name="pref_debug_verbose_logging_summary">Записывать все управляющие сообщения CarbitLink/Android Auto с шестнадцатеричным представлением, включая видео и аудио. Большой объём данных; экспорт через инструменты разработчика.</string>
+    <string name="pref_debug_overlay_title">Отладочная информация на экране</string>
+    <string name="pref_debug_overlay_summary">Показывать частоту кадров, битрейт и пропуски кадров при трансляции, в сеансе Android Auto и на экране приложения</string>
+    <string name="pref_auto_save_crash_log_title">Автосохранение журнала сбоев в папку «Загрузки»</string>
+    <string name="pref_auto_save_crash_log_summary">При сбое автоматически сохранять текущий журнал в папку «Загрузки»</string>
+    <string name="pref_developer_tools_title">Инструменты разработчика</string>
+    <string name="pref_developer_tools_summary">Экспорт журналов, предпросмотр экрана автомобиля</string>
+</resources>

@@ -2,8 +2,11 @@ package dev.caraalink.link
 
 import android.content.Context
 import dev.caraalink.diagnostics.DiagnosticLogger
+import java.io.File
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import kotlin.io.path.createTempDirectory
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -19,6 +22,7 @@ import org.mockito.Mockito.`when`
  */
 class MirrorControlChannelTest {
 
+    private lateinit var tempDir: File
     private lateinit var host: FakeMirrorHost
     private lateinit var channel: MirrorControlChannel
     private lateinit var stream: FakeStream
@@ -26,12 +30,18 @@ class MirrorControlChannelTest {
     @Before
     fun setUp() {
         val context = mock(Context::class.java)
-        `when`(context.getExternalFilesDir(null)).thenReturn(createTempDir())
+        tempDir = createTempDirectory(prefix = "aa-bridge-test-").toFile()
+        `when`(context.getExternalFilesDir(null)).thenReturn(tempDir)
         val logger = DiagnosticLogger(context, "test")
         host = FakeMirrorHost()
         channel = MirrorControlChannel(logger, host)
         stream = FakeStream()
         channel.onOpen(stream)
+    }
+
+    @After
+    fun tearDown() {
+        if (::tempDir.isInitialized) tempDir.deleteRecursively()
     }
 
     @Test

@@ -40,7 +40,7 @@ jobs:
 
       - name: Install required SDK platform/build-tools
         run: |
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-34" "build-tools;34.0.0"
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-34" "build-tools;36.0.0"
 
       - name: Verify Gradle Wrapper
         run: echo "498495120a03b9a6ab5d155f5de3c8f0d986a449153702fb80fc80e134484f17  gradle/wrapper/gradle-wrapper.jar" | sha256sum -c -
@@ -97,7 +97,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p audit
-          tools="$ANDROID_HOME/build-tools/34.0.0"
+          tools="$ANDROID_HOME/build-tools/36.0.0"
           apk="app/build/outputs/apk/debug/app-debug.apk"
           "$tools/apksigner" verify --verbose --print-certs "$apk" | tee audit/apk-signature.txt
           "$tools/aapt" dump permissions "$apk" | tee audit/apk-permissions.txt

@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="resolution_mode_entries">
+        <item>Как на головном устройстве (авто)</item>
+        <item>Вручную</item>
+    </string-array>
+
+    <string-array name="car_orientation_entries">
+        <item>Автоопределение по автомобилю</item>
+        <item>Альбомная (широкий экран)</item>
+        <item>Книжная (высокий экран)</item>
+    </string-array>
+
+    <string-array name="frame_rate_entries">
+        <item>24 кадр/с</item>
+        <item>30 кадр/с</item>
+        <item>60 кадр/с</item>
+    </string-array>
+
+    <string-array name="sample_rate_entries">
+        <item>44,1 кГц</item>
+        <item>48 кГц</item>
+    </string-array>
+
+    <string-array name="aa_fill_mode_entries">
+        <item>Вписать (всё изображение, чёрные полосы)</item>
+        <item>Заполнить (на весь экран, с обрезкой)</item>
+    </string-array>
+
+    <string-array name="aa_audio_route_entries">
+        <item>Bluetooth при подключении, иначе телефон</item>
+        <item>Всегда микрофон и динамик телефона</item>
+        <item>Телефон сам воспроизводит музыку и подсказки (через Bluetooth автомобиля)</item>
+    </string-array>
+
+    <string-array name="usb_role_entries">
+        <item>Авто (подтверждено: аксессуар)</item>
+        <item>Принудительно: аксессуар</item>
+        <item>Принудительно: хост</item>
+    </string-array>
+</resources>

@@ -1,5 +1,7 @@
 package dev.caraalink
 
+import dev.caraalink.R
+
 import android.content.Intent
 import android.hardware.usb.UsbAccessory
 import android.hardware.usb.UsbManager
@@ -46,7 +48,7 @@ class MainActivity : ComponentActivity() {
         )
         Log.i(TAG, "onCreate: launch intent action=${intent?.action} extras=${intent?.extras}")
         dev.caraalink.diagnostics.CrashMarker.consumeLastCrash(this)?.let { summary ->
-            Toast.makeText(this, "Restarted after a crash: $summary", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, getString(R.string.crash_restarted, summary), Toast.LENGTH_LONG).show()
         }
         maybeAutoStartOnAttach(intent, recreated = savedInstanceState != null)
         maybeStartAaTls(intent)
@@ -127,13 +129,13 @@ class MainActivity : ComponentActivity() {
         if (op == "stop") {
             Log.i(TAG, "aa_tls: stopping receiver")
             AaTlsReceiver.active?.stop()
-            Toast.makeText(this, "AA TLS receiver stopped", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, getString(R.string.tls_stopped), Toast.LENGTH_SHORT).show()
             return
         }
 
         if (AaTlsReceiver.active != null) {
             Log.w(TAG, "aa_tls: receiver already running, ignoring '$op'")
-            Toast.makeText(this, "AA TLS receiver already running", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, getString(R.string.tls_running), Toast.LENGTH_SHORT).show()
             return
         }
 
@@ -154,7 +156,7 @@ class MainActivity : ComponentActivity() {
         )
         Log.i(TAG, "aa_tls: starting receiver $config")
         AaTlsReceiver(this, config).start()
-        Toast.makeText(this, "AA TLS receiver: ${mode.name}/${role.name}", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, getString(R.string.tls_status, mode.name, role.name), Toast.LENGTH_SHORT).show()
     }
 
     private fun maybeAutoStartOnAttach(intent: Intent?, recreated: Boolean = false) {

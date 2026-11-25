@@ -1,5 +1,7 @@
 package dev.caraalink.diagnostics
 
+import dev.caraalink.R
+
 import android.app.Activity
 import android.graphics.Color
 import android.os.Bundle
@@ -8,6 +10,7 @@ import android.os.Looper
 import android.util.TypedValue
 import android.widget.LinearLayout
 import android.widget.TextView
+import dev.caraalink.connection.ConnectionPhase
 import dev.caraalink.connection.ConnectionSnapshot
 import dev.caraalink.connection.ConnectionStateHolder
 
@@ -38,7 +41,7 @@ class ConnectionDiagnosticsActivity : Activity() {
             setPadding(pad, pad, pad, pad)
             setBackgroundColor(Color.parseColor("#0E1116"))
             addView(TextView(this@ConnectionDiagnosticsActivity).apply {
-                text = "Connection diagnostics"
+                text = getString(R.string.dev_diagnostics)
                 setTextColor(Color.parseColor("#F2F5F7"))
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 26f)
                 setPadding(0, 0, 0, dp(20))
@@ -64,12 +67,19 @@ class ConnectionDiagnosticsActivity : Activity() {
 
     private fun render(snapshot: ConnectionSnapshot) {
         statusView.text = buildString {
-            appendLine("Phase: ${snapshot.phase}")
-            appendLine("Accessory: ${snapshot.accessoryManufacturer ?: "-"} / ${snapshot.accessoryModel ?: "-"}")
-            appendLine("Bytes read: ${snapshot.bytesRead}")
-            appendLine("Bytes written: ${snapshot.bytesWritten}")
-            appendLine("Reconnect attempts: ${snapshot.reconnectAttempts}")
-            appendLine("Last error: ${snapshot.lastError ?: "-"}")
+            appendLine(getString(R.string.diag_phase, getString(when (snapshot.phase) {
+                ConnectionPhase.DISCONNECTED -> R.string.diag_phase_disconnected
+                ConnectionPhase.ATTACHED -> R.string.diag_phase_attached
+                ConnectionPhase.SNIFFING -> R.string.diag_phase_sniffing
+                ConnectionPhase.STREAMING -> R.string.diag_phase_streaming
+                ConnectionPhase.RECONNECTING -> R.string.diag_phase_reconnecting
+                ConnectionPhase.ERROR -> R.string.diag_phase_error
+            })))
+            appendLine(getString(R.string.diag_accessory, snapshot.accessoryManufacturer ?: "-", snapshot.accessoryModel ?: "-"))
+            appendLine(getString(R.string.diag_read, snapshot.bytesRead))
+            appendLine(getString(R.string.diag_written, snapshot.bytesWritten))
+            appendLine(getString(R.string.diag_reconnect, snapshot.reconnectAttempts))
+            appendLine(getString(R.string.diag_error, snapshot.lastError ?: "-"))
         }
     }
 }

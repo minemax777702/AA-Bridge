@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pref_reconnecting">Reconnecting Android Auto with the new setting…</string>
+    <string name="profile_save_new">+ Save current settings as...</string>
+    <string name="profile_title">Car profiles</string>
+    <string name="action_close">Close</string>
+    <string name="profile_name_hint">e.g. My Car</string>
+    <string name="profile_save_title">Save current settings as</string>
+    <string name="action_save">Save</string>
+    <string name="profile_saved">Saved \"%1$s\"</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_load">Load</string>
+    <string name="action_delete">Delete</string>
+    <string name="profile_loaded">Loaded \"%1$s\" -- reconnecting if AA is active</string>
+    <string name="profile_deleted">Deleted \"%1$s\"</string>
+    <string name="pref_dpi_auto_summary">Scale density to the chosen resolution (currently sending density=%1$d)</string>
+    <string name="pref_dpi_manual_summary">Only used when auto-detect is off (currently sending density=%1$d)</string>
+    <string name="dev_tools">Developer tools</string>
+    <string name="dev_export_log">Export latest log</string>
+    <string name="dev_save_log">Save log to Downloads</string>
+    <string name="dev_clear_logs">Clear logs</string>
+    <string name="dev_preview">Car Preview</string>
+    <string name="dev_diagnostics">Connection diagnostics</string>
+    <string name="dev_no_logs">No logs yet</string>
+    <string name="dev_share_logs">Share AndroidAuto Bridge logs</string>
+    <string name="dev_logs_cleared">Logs cleared</string>
+    <string name="dev_save_failed">Save failed</string>
+    <string name="dev_preview_desc">Car Preview: starts (or attaches to) a real Android Auto session on this phone, with decoded video and touch, for testing without the car.</string>
+    <string name="dev_saved_downloads">Saved %1$s to Downloads</string>
+    <string name="dev_sharing">Sharing %1$s</string>
+    <string name="diag_phase">Phase: %1$s</string>
+    <string name="diag_accessory">Accessory: %1$s / %2$s</string>
+    <string name="diag_read">Bytes read: %1$d</string>
+    <string name="diag_written">Bytes written: %1$d</string>
+    <string name="diag_reconnect">Reconnect attempts: %1$d</string>
+    <string name="diag_error">Last error: %1$s</string>
+    <string name="crash_restarted">Restarted after a crash: %1$s</string>
+    <string name="tls_stopped">AA TLS receiver stopped</string>
+    <string name="tls_running">AA TLS receiver already running</string>
+    <string name="tls_status">AA TLS receiver: %1$s/%2$s</string>
+    <string name="fgs_sniffing">Diagnostic sniffer running (%1$d bytes)</string>
+    <string name="diag_phase_disconnected">Disconnected</string>
+    <string name="diag_phase_attached">Attached</string>
+    <string name="diag_phase_sniffing">Sniffing</string>
+    <string name="diag_phase_streaming">Streaming</string>
+    <string name="diag_phase_reconnecting">Reconnecting</string>
+    <string name="diag_phase_error">Error</string>
+</resources>

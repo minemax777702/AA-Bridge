@@ -2,8 +2,11 @@ package dev.caraalink.link
 
 import android.content.Context
 import dev.caraalink.diagnostics.DiagnosticLogger
+import java.io.File
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import kotlin.io.path.createTempDirectory
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
 import org.junit.Before
@@ -14,6 +17,7 @@ import org.mockito.Mockito.`when`
 /** Headless coverage for tcp:10920 (mirror data): see MirrorControlChannelTest for the pattern. */
 class MirrorDataChannelTest {
 
+    private lateinit var tempDir: File
     private lateinit var host: FakeMirrorHost
     private lateinit var channel: MirrorDataChannel
     private lateinit var stream: FakeStream
@@ -21,10 +25,16 @@ class MirrorDataChannelTest {
     @Before
     fun setUp() {
         val context = mock(Context::class.java)
-        `when`(context.getExternalFilesDir(null)).thenReturn(createTempDir())
+        tempDir = createTempDirectory(prefix = "aa-bridge-test-").toFile()
+        `when`(context.getExternalFilesDir(null)).thenReturn(tempDir)
         host = FakeMirrorHost()
         channel = MirrorDataChannel(DiagnosticLogger(context, "test"), host)
         stream = FakeStream()
+    }
+
+    @After
+    fun tearDown() {
+        if (::tempDir.isInitialized) tempDir.deleteRecursively()
     }
 
     @Test
