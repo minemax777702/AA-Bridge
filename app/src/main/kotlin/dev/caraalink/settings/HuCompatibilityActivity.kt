@@ -34,7 +34,7 @@ class HuCompatibilityActivity : ComponentActivity() {
     }
 }
 
-private val routeLabels = mapOf(
+internal val routeLabels = mapOf(
     "phone_direct" to R.string.hu_audio_phone_direct,
     "bt_preferred" to R.string.hu_audio_bluetooth,
     "device_only" to R.string.hu_audio_device,
@@ -77,6 +77,9 @@ private fun CompatibilityScreen(onBack: () -> Unit) {
     }
     SubScreen(stringResource(R.string.hu_compat_title), onBack) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Button(modifier = Modifier.fillMaxWidth(), onClick = {
+                context.startActivity(Intent(context, HuWizardActivity::class.java))
+            }) { Text(stringResource(R.string.hu_wizard_title)) }
             CompatibilityTile(R.string.hu_profiles) {
                 Text(stringResource(R.string.hu_reconnect), color = Dash.Muted, style = MaterialTheme.typography.bodySmall)
                 Row(verticalAlignment = Alignment.CenterVertically) {

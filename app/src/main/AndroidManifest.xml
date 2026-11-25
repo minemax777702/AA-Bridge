@@ -58,6 +58,11 @@
         </activity>
 
         <activity
+            android:name=".settings.HuWizardActivity"
+            android:label="@string/hu_wizard_title"
+            android:exported="false" />
+
+        <activity
             android:name=".settings.HuCompatibilityActivity"
             android:label="@string/hu_compat_title"
             android:exported="false" />

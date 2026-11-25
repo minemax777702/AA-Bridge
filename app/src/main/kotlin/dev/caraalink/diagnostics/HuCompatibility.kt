@@ -12,6 +12,8 @@ internal object HuCompatibility {
     data class Evidence(
         val protocol: String = "",
         val connected: Boolean = false,
+        val sessionId: String = "",
+        val musicDeclared: Boolean? = null,
         val appliedProfile: String = "",
         val name: String = "",
         val screen: String = "",
@@ -33,7 +35,7 @@ internal object HuCompatibility {
 
     @Synchronized fun start(token: Any, protocol: String, appliedProfile: String) {
         owner = token
-        mutable.value = Evidence(protocol = protocol, connected = true, appliedProfile = appliedProfile)
+        mutable.value = Evidence(protocol = protocol, connected = true, sessionId = java.util.UUID.randomUUID().toString(), appliedProfile = appliedProfile)
         recent.clear()
         written = 0
         windowStart = SystemClock.elapsedRealtime()
@@ -116,7 +118,7 @@ internal object HuCompatibility {
         if (channel == "PXC") when (cmd) {
             0x10010 -> if (json != null) e = e.copy(name = json.optString("HUName").take(100),
                 micDeclared = if (json.has("supportMic")) json.opt("supportMic") == true else null)
-            0x10020 -> if (json != null) e = e.copy(capabilities = listOf("music","tts","vr","talkie","autoChangeToBT")
+            0x10020 -> if (json != null) e = e.copy(musicDeclared = json.opt("music") as? Boolean, capabilities = listOf("music","tts","vr","talkie","autoChangeToBT")
                 .joinToString(" · ") { "$it=${json.opt(it) ?: "?"}" })
             0x20091 -> e = e.copy(playbackAck = true)
             0x200F1 -> e = e.copy(micAck = true)
