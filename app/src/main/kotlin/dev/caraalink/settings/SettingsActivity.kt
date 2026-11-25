@@ -55,6 +55,10 @@ class SettingsActivity : AppCompatActivity() {
         override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
             setPreferencesFromResource(dev.caraalink.R.xml.root_preferences, rootKey)
             updateDpiSummary()
+            if (!dev.caraalink.BuildConfig.DEBUG) {
+                findPreference<Preference>("debug_verbose_logging")?.isVisible = false
+                findPreference<Preference>("debug_overlay")?.isVisible = false
+            }
 
             findPreference<Preference>("developer_tools")?.setOnPreferenceClickListener {
                 startActivity(Intent(requireContext(), dev.caraalink.diagnostics.DeveloperToolsActivity::class.java))
@@ -129,6 +133,11 @@ class SettingsActivity : AppCompatActivity() {
         private fun updateDpiSummary() {
             val context = requireContext()
             val config = dev.caraalink.aa.AaServiceDiscovery.configFromSettings(context)
+            val custom = AppSettings.resolutionMode(context) == AppSettings.ResolutionMode.CUSTOM
+            findPreference<Preference>("video_resolution_custom_width")?.isVisible = custom
+            findPreference<Preference>("video_resolution_custom_height")?.isVisible = custom
+            findPreference<Preference>("video_dpi_manual")?.isVisible = !AppSettings.videoDpiAuto(context)
+            findPreference<Preference>("aa_carbit_mic")?.isVisible = AppSettings.aaAudioRoute(context) == AppSettings.AaAudioRoute.CARBIT_EXPERIMENTAL
             findPreference<androidx.preference.SwitchPreferenceCompat>("video_dpi_auto")?.summary =
                 getString(R.string.pref_dpi_auto_summary, config.density)
             findPreference<Preference>("video_dpi_manual")?.summary =

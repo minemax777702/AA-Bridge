@@ -13,9 +13,6 @@
     <string name="pref_video_dpi_auto_summary">Использовать плотность экрана телефона для сеанса Android Auto</string>
     <string name="pref_video_dpi_manual_title">DPI вручную</string>
     <string name="pref_video_dpi_manual_summary">Используется только при отключённом автоопределении</string>
-    <string name="pref_category_audio_title">Аудио</string>
-    <string name="pref_audio_sample_rate_title">Частота дискретизации</string>
-    <string name="pref_audio_stereo_title">Стерео</string>
     <string name="pref_category_android_auto_title">Android Auto</string>
     <string name="pref_car_profiles_title">Профили автомобилей</string>
     <string name="pref_car_profiles_summary">Сохранение и загрузка настроек видео и Android Auto для каждого автомобиля (ориентация, разрешение, заполнение и т. д.)</string>
@@ -27,11 +24,6 @@
     <string name="pref_aa_audio_route_summary">Устройство для передачи и воспроизведения голосовых команд и медиа Android Auto</string>
     <string name="pref_aa_auto_crop_title">Автоматическая обрезка по форме экрана</string>
     <string name="pref_aa_auto_crop_summary">Автоматически рассчитывать обрезку видео по фактическому размеру экрана автомобиля вместо обычных чёрных полос. Отключите, если изображение выглядит хуже.</string>
-    <string name="pref_category_connection_title">Подключение</string>
-    <string name="pref_auto_reconnect_usb_title">Автоподключение</string>
-    <string name="pref_auto_reconnect_usb_summary">Автоматически восстанавливать USB-подключение при обрыве</string>
-    <string name="pref_usb_role_override_title">Роль USB (отладка)</string>
-    <string name="pref_usb_role_override_summary">Подтверждено: телефон — USB-аксессуар, головное устройство — хост. Меняйте только для тестирования.</string>
     <string name="pref_category_debug_title">Отладка</string>
     <string name="pref_debug_verbose_logging_title">Перехват протокола</string>
     <string name="pref_debug_verbose_logging_summary">Записывать все управляющие сообщения CarbitLink/Android Auto с шестнадцатеричным представлением, включая видео и аудио. Большой объём данных; экспорт через инструменты разработчика.</string>

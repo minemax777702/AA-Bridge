@@ -62,7 +62,7 @@ import dev.caraalink.settings.SettingsActivity
 /** Page with a back arrow and a title; Settings, Help and About share it. */
 @Composable
 fun SubScreen(title: String, onBack: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
-    Surface(Modifier.fillMaxSize().dashGlow(Dash.GlowIdle), color = Color.Transparent, contentColor = Dash.Text) {
+    Surface(Modifier.fillMaxSize().background(Dash.Background), color = Color.Transparent, contentColor = Dash.Text) {
         Column(Modifier.fillMaxSize().systemBarsPadding()) {
             Row(Modifier.padding(horizontal = 8.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = null, tint = Dash.Teal) }

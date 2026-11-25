@@ -48,19 +48,6 @@
             android:defaultValue="160" />
     </PreferenceCategory>
 
-    <PreferenceCategory android:title="@string/pref_category_audio_title">
-        <ListPreference
-            android:key="audio_sample_rate"
-            android:title="@string/pref_audio_sample_rate_title"
-            android:entries="@array/sample_rate_entries"
-            android:entryValues="@array/sample_rate_values"
-            android:defaultValue="48000" />
-        <SwitchPreferenceCompat
-            android:key="audio_stereo"
-            android:title="@string/pref_audio_stereo_title"
-            android:defaultValue="true" />
-    </PreferenceCategory>
-
     <PreferenceCategory android:title="@string/pref_category_android_auto_title">
         <Preference
             android:key="car_profiles"
@@ -97,22 +84,7 @@
             android:defaultValue="true" />
     </PreferenceCategory>
 
-    <PreferenceCategory android:title="@string/pref_category_connection_title">
-        <SwitchPreferenceCompat
-            android:key="auto_reconnect_usb"
-            android:title="@string/pref_auto_reconnect_usb_title"
-            android:summary="@string/pref_auto_reconnect_usb_summary"
-            android:defaultValue="true" />
-        <ListPreference
-            android:key="usb_role_override"
-            android:title="@string/pref_usb_role_override_title"
-            android:summary="@string/pref_usb_role_override_summary"
-            android:entries="@array/usb_role_entries"
-            android:entryValues="@array/usb_role_values"
-            android:defaultValue="auto" />
-    </PreferenceCategory>
-
-    <PreferenceCategory android:title="@string/pref_category_debug_title">
+    <PreferenceCategory android:key="diagnostic_category" android:title="@string/pref_category_debug_title">
         <SwitchPreferenceCompat
             android:key="debug_verbose_logging"
             android:title="@string/pref_debug_verbose_logging_title"

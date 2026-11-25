@@ -10,7 +10,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -19,44 +18,6 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
 import dev.caraalink.R
 import dev.caraalink.ui.theme.Dash
-
-enum class RingMode { IDLE, SPIN, FULL, ALERT }
-
-@Suppress("UNUSED_PARAMETER")
-fun Modifier.dashGlow(glow: Color): Modifier = background(Dash.Background)
-
-@Composable
-fun StatusRing(mode: RingMode, icon: Painter, label: String, modifier: Modifier = Modifier) {
-    val color = when (mode) {
-        RingMode.IDLE, RingMode.SPIN -> Dash.Teal
-        RingMode.ALERT -> Dash.Amber
-        RingMode.FULL -> Color(0xFF8DD8B1)
-    }
-    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Box(Modifier.size(84.dp).background(color.copy(alpha = 0.11f), RoundedCornerShape(26.dp)),
-            contentAlignment = Alignment.Center) {
-            if (mode == RingMode.SPIN) CircularProgressIndicator(Modifier.size(64.dp), color = color, strokeWidth = 2.dp)
-            Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(34.dp))
-        }
-        Text(label, color = color, style = MaterialTheme.typography.labelLarge)
-    }
-}
-
-enum class Lamp { ON, OFF, ALERT }
-
-@Composable
-fun Telltale(icon: Painter, label: String, lamp: Lamp) {
-    val color = when (lamp) {
-        Lamp.ON -> Dash.Teal
-        Lamp.ALERT -> Dash.Amber
-        Lamp.OFF -> Dash.Muted
-    }
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(18.dp))
-        Text(label, color = color, style = MaterialTheme.typography.bodySmall)
-    }
-}
 
 @Composable
 fun GlowButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {

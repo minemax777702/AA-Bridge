@@ -6,14 +6,11 @@ import androidx.preference.PreferenceManager
 
 /**
  * Typed reads over the preferences declared in res/xml/root_preferences.xml.
- * Nothing in the capture/protocol pipeline consumes these yet — they're wired
- * up as that code lands (see claude/roadmap.md Phase 2/3). Keys here must
- * stay in sync with root_preferences.xml.
+ * These preferences are consumed by the active connection, video and audio paths.
  */
 object AppSettings {
 
     enum class ResolutionMode { AUTO, CUSTOM }
-    enum class UsbRoleOverride { AUTO, FORCE_ACCESSORY, FORCE_HOST }
     enum class AaAudioRoute { BT_PREFERRED, DEVICE_ONLY, PHONE_DIRECT, CARBIT_EXPERIMENTAL }
     enum class CarOrientation { AUTO, LANDSCAPE, PORTRAIT }
     enum class AaFillMode { FIT, FILL }
@@ -92,28 +89,11 @@ object AppSettings {
     fun manualVideoDpi(context: Context): Int =
         prefs(context).getString("video_dpi_manual", "160")?.toIntOrNull() ?: 160
 
-    fun audioSampleRateHz(context: Context): Int =
-        prefs(context).getString("audio_sample_rate", "48000")?.toIntOrNull() ?: 48000
-
-    fun audioStereo(context: Context): Boolean =
-        prefs(context).getBoolean("audio_stereo", true)
-
-    fun autoReconnectUsb(context: Context): Boolean =
-        prefs(context).getBoolean("auto_reconnect_usb", true)
-
-    /** Debug-only. USB role is CONFIRMED (phone = accessory) — see claude/roadmap.md. */
-    fun usbRoleOverride(context: Context): UsbRoleOverride =
-        when (prefs(context).getString("usb_role_override", "auto")) {
-            "accessory" -> UsbRoleOverride.FORCE_ACCESSORY
-            "host" -> UsbRoleOverride.FORCE_HOST
-            else -> UsbRoleOverride.AUTO
-        }
-
     fun verboseLogging(context: Context): Boolean =
-        prefs(context).getBoolean("debug_verbose_logging", false)
+        dev.caraalink.BuildConfig.DEBUG && prefs(context).getBoolean("debug_verbose_logging", false)
 
     fun debugOverlay(context: Context): Boolean =
-        prefs(context).getBoolean("debug_overlay", false)
+        dev.caraalink.BuildConfig.DEBUG && prefs(context).getBoolean("debug_overlay", false)
 
     fun autoSaveCrashLog(context: Context): Boolean =
         prefs(context).getBoolean("auto_save_crash_log", true)

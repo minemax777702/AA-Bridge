@@ -36,7 +36,7 @@ object CarProfiles {
 
     fun saveProfile(context: Context, name: String) {
         if (name.isBlank()) return
-        val defaults = PreferenceManagerCompat.default(context)
+        val defaults = androidx.preference.PreferenceManager.getDefaultSharedPreferences(context)
         val snapshot = JSONObject()
         for (key in PROFILE_KEYS) {
             when (val value = defaults.all[key]) {
@@ -54,7 +54,7 @@ object CarProfiles {
     fun loadProfile(context: Context, name: String): Boolean {
         val json = store(context).getString(name, null) ?: return false
         val snapshot = JSONObject(json)
-        val defaults = PreferenceManagerCompat.default(context)
+        val defaults = androidx.preference.PreferenceManager.getDefaultSharedPreferences(context)
         val editor = defaults.edit()
         for (key in PROFILE_KEYS) {
             if (!snapshot.has(key)) continue
@@ -74,7 +74,3 @@ object CarProfiles {
     }
 }
 
-/** Thin wrapper so CarProfiles doesn't need an androidx.preference import for one call. */
-private object PreferenceManagerCompat {
-    fun default(context: Context) = androidx.preference.PreferenceManager.getDefaultSharedPreferences(context)
-}

@@ -12,15 +12,10 @@
     </string-array>
 
     <string-array name="frame_rate_entries">
-        <item>24 кадр/с</item>
         <item>30 кадр/с</item>
         <item>60 кадр/с</item>
     </string-array>
 
-    <string-array name="sample_rate_entries">
-        <item>44,1 кГц</item>
-        <item>48 кГц</item>
-    </string-array>
 
     <string-array name="aa_fill_mode_entries">
         <item>Вписать (всё изображение, чёрные полосы)</item>
@@ -34,9 +29,4 @@
         <item>Звук через CarbitLink (экспериментально, с резервным выводом)</item>
     </string-array>
 
-    <string-array name="usb_role_entries">
-        <item>Авто (подтверждено: аксессуар)</item>
-        <item>Принудительно: аксессуар</item>
-        <item>Принудительно: хост</item>
-    </string-array>
 </resources>

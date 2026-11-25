@@ -111,7 +111,7 @@ fun SetupScreen(onDone: () -> Unit, onOpenNearby: () -> Unit) {
         requested = true
     }
 
-    Surface(Modifier.fillMaxSize().dashGlow(Dash.GlowIdle), color = Color.Transparent, contentColor = Dash.Text) {
+    Surface(Modifier.fillMaxSize().background(Dash.Background), color = Color.Transparent, contentColor = Dash.Text) {
         Column(Modifier.fillMaxSize().systemBarsPadding().verticalScroll(rememberScrollState())) {
             BrandBar()
             Column(Modifier.padding(horizontal = 24.dp)) {
