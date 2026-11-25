@@ -51,6 +51,17 @@ private fun CompatibilityScreen(onBack: () -> Unit) {
     var gestures by remember { mutableStateOf(prefs.getString(AppSettings.HU_GESTURES_KEY, "AUTO") ?: "AUTO") }
     var capture by remember { mutableStateOf(AppSettings.huCapture(context)) }
     var expandedRoute by remember { mutableStateOf<String?>(if (auto) null else route) }
+    DisposableEffect(prefs) {
+        val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
+            auto = AppSettings.huAuto(context)
+            route = prefs.getString("aa_audio_route", "phone_direct") ?: "phone_direct"
+            mic = prefs.getBoolean("aa_carbit_mic", false)
+            gestures = prefs.getString(AppSettings.HU_GESTURES_KEY, "AUTO") ?: "AUTO"
+            capture = AppSettings.huCapture(context)
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        onDispose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
     val evidence by HuCompatibility.state.collectAsState()
     val scope = rememberCoroutineScope()
     var exporting by remember { mutableStateOf(false) }
