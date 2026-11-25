@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="hu_extra_show">Дополнительные автоматические и ручные тесты</string>
+    <string name="hu_extra_hide">Скрыть дополнительные тесты</string>
+    <string name="hu_extra_audio">Тестовые звуковые сигналы</string>
+    <string name="hu_extra_closed">Выйдите из Android Auto на ГУ, не разрывая соединение. Остановите другой звук и уменьшите громкость перед тестом.</string>
+    <string name="hu_extra_audio_hint">Короткие сигналы малой амплитуды: левый, правый и оба канала. Моно TTS — три последовательных сигнала. Системный звук не проверяет медиаканал Android Auto. Подтвердите слышимость вручную.</string>
+    <string name="hu_extra_auto_signals">Запустить все тестовые сигналы</string>
+    <string name="hu_extra_manual_signal">Воспроизвести сигнал</string>
+    <string name="hu_extra_stop">Остановить</string>
+    <string name="hu_extra_signal_sent">Сигнал передан; слышимость не подтверждена</string>
+    <string name="hu_extra_signal_failed">Недоступно / ошибка передачи</string>
+    <string name="hu_extra_silent">Нет звука</string>
+    <string name="hu_extra_distorted">Искажения / прерывания</string>
+    <string name="hu_extra_system">Системный маршрут Android</string>
+    <string name="hu_extra_pcm_music">CarbitLink MUSIC · стерео 48 кГц</string>
+    <string name="hu_extra_pcm_tts">CarbitLink TTS · моно 16 кГц</string>
+    <string name="hu_extra_calibration">Калибровка сенсора</string>
+    <string name="hu_extra_cal_hint">Выйдите из Android Auto, сохранив соединение. По очереди нажмите девять подсвеченных точек на ГУ. Коррекция действует только в текущем подключении.</string>
+    <string name="hu_extra_cal_start">Открыть калибровку на ГУ</string>
+    <string name="hu_cal_screen">Нажмите подсвеченную точку · %1$d / %2$d</string>
+    <string name="hu_extra_cal_errors">Макс. нормализованная ошибка: до %1$.1f%% · после %2$.1f%%</string>
+    <string name="hu_extra_cal_valid">Контрольные точки пройдены</string>
+    <string name="hu_extra_cal_invalid">Калибровка ненадёжна; повторите</string>
+    <string name="hu_extra_cal_apply">Применить коррекцию для подключения</string>
+    <string name="hu_extra_cal_reset">Сбросить калибровку</string>
+    <string name="hu_extra_compare">Сравнение с оригинальным CarbitLink</string>
+    <string name="hu_extra_compare_hint">Импортируйте доступный вам текстовый лог оригинала и AA-Bridge. Формат: RX PXC 0x10010 len=80 (направление относительно телефона). Сравниваются команды и длины, без аудио и видео. Отсутствие команды может быть связано с неполным логом.</string>
+    <string name="hu_extra_reference">Импорт эталона CarbitLink</string>
+    <string name="hu_extra_bridge">Импорт журнала AA-Bridge</string>
+    <string name="hu_extra_current_log">Использовать последний локальный журнал</string>
+    <string name="hu_extra_trace_count">Уникальных команд: %1$d · записей: %2$d</string>
+    <string name="hu_extra_trace_truncated">Вход ограничен 2 МиБ / 30000 строк; сравнение может быть неполным.</string>
+    <string name="hu_extra_trace_error">Нет распознаваемых записей или ошибка импорта.</string>
+    <string name="hu_extra_compare_run">Сравнить журналы</string>
+    <string name="hu_extra_diff_count">Различий в командах / длинах: %1$d</string>
+    <string name="hu_extra_diff_limit">Показаны первые 128 различий.</string>
+</resources>

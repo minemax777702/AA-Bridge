@@ -13,10 +13,14 @@ import dev.caraalink.R
 import dev.caraalink.diagnostics.HuCalibration
 
 internal class HuCalibrationPresentation(context: Context, display: Display, private val samples: () -> List<HuCalibration.Point>) : Presentation(context, display) {
+    private var surface: View? = null
+    fun refresh() { surface?.invalidate() }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window?.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN)
-        setContentView(object : View(context) {
+        @Suppress("DEPRECATION")
+        window?.decorView?.systemUiVisibility = View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+        val targetView = object : View(context) {
             private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
             override fun onDraw(canvas: Canvas) {
                 canvas.drawColor(Color.rgb(17,20,25))
@@ -40,6 +44,8 @@ internal class HuCalibrationPresentation(context: Context, display: Display, pri
                 paint.textAlign = Paint.Align.CENTER; paint.textSize = (height*.04f).coerceAtLeast(14f)
                 canvas.drawText(context.getString(R.string.hu_cal_screen, recorded.size, targets.size),width/2f,height*.07f,paint)
             }
-        })
+        }
+        surface = targetView
+        setContentView(targetView)
     }
 }

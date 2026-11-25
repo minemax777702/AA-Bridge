@@ -67,6 +67,7 @@ private fun HuWizardScreen(onBack: () -> Unit) {
     var exporting by remember { mutableStateOf(false) }
     var exportError by remember { mutableStateOf(false) }
     var notice by remember { mutableStateOf<Int?>(null) }
+    var extraTests by remember { mutableStateOf(false) }
 
     fun save(value: HuWizardStore.Run) {
         store.save(value)
@@ -96,6 +97,10 @@ private fun HuWizardScreen(onBack: () -> Unit) {
                 Checkbox(checked = parked, onCheckedChange = { parked = it })
                 Text(stringResource(R.string.hu_wizard_parked_confirm), modifier = Modifier.padding(top = 12.dp))
             }
+            OutlinedButton(modifier = Modifier.fillMaxWidth(), onClick = { extraTests = !extraTests }) {
+                Text(stringResource(if (extraTests) R.string.hu_extra_hide else R.string.hu_extra_show))
+            }
+            if (extraTests) HuAdvancedTests(evidence.sessionId, parked && ready && (run == null || run?.target == fingerprint))
             val current = run
             if (current == null) {
                 WizardTile(R.string.hu_wizard_identify) {
