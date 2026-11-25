@@ -28,8 +28,7 @@ object UpdateChecker {
     private const val CHANNEL_ID = "app_updates"
     private const val NOTIFICATION_ID = 4
 
-    /** [apkUrl] is null if the release has no `.apk` asset attached (nothing to auto-download). */
-    private data class UpdateInfo(val title: String, val htmlUrl: String, val apkUrl: String?)
+    private data class UpdateInfo(val title: String, val htmlUrl: String)
 
     private fun logger(context: Context) = DiagnosticLogger(context, "update-checker")
 
@@ -66,7 +65,7 @@ object UpdateChecker {
         val json = JSONObject(body)
         val tag = json.getString("tag_name").removePrefix("v")
         if (!isNewerVersion(tag, BuildConfig.VERSION_NAME)) return null
-        return UpdateInfo("Update available: v$tag", json.getString("html_url"), apkAssetUrl(json))
+        return UpdateInfo("Update available: v$tag", "https://github.com/$OWNER/$REPO/releases/tag/v$tag")
     }
 
     /** Accept only stable numeric release versions; reject older or malformed tags. */
@@ -82,16 +81,6 @@ object UpdateChecker {
             if (next[i] != installed[i]) return next[i] > installed[i]
         }
         return false
-    }
-
-    /** First `.apk` asset's direct download URL, or null if the release has none attached. */
-    private fun apkAssetUrl(release: JSONObject): String? {
-        val assets = release.optJSONArray("assets") ?: return null
-        for (i in 0 until assets.length()) {
-            val asset = assets.getJSONObject(i)
-            if (asset.getString("name").endsWith(".apk")) return asset.getString("browser_download_url")
-        }
-        return null
     }
 
     /** null on a 404 (nothing there to compare against); throws on any other non-2xx. */
@@ -116,7 +105,7 @@ object UpdateChecker {
         Toast.makeText(context, text, Toast.LENGTH_LONG).show()
 
     /**
-     * Shows a popup with a Download button when called while the app is in
+     * Shows a popup with an Open GitHub button when called while the app is in
      * the foreground (the only caller, MainActivity, always passes itself as
      * an Activity context); also raises a notification covering the case
      * where the check landed while the user wasn't looking at the dialog
@@ -140,52 +129,6 @@ object UpdateChecker {
 
     private fun openPage(context: Context, url: String) =
         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-
-    /**
-     * Checks [apkUrl] via DownloadManager (so it survives the dialog
-     * closing and shows its own progress notification), then on completion
-     * either launches the system package installer directly (if this app
-     * already has the "install unknown apps" grant) or sends the user to
-     * the one-time system settings screen to grant it -- can't be skipped,
-     * Android gates this at the OS level regardless of what permission this
-     * app declares.
-     */
-    private fun downloadAndInstall(context: Context, apkUrl: String, title: String) {
-        val dir = File(context.getExternalFilesDir(null), "updates").apply { mkdirs() }
-        val dest = File(dir, "update.apk")
-        dest.delete()
-        val request = DownloadManager.Request(Uri.parse(apkUrl))
-            .setTitle(title)
-            .setDescription("Downloading AA Bridge update")
-            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-            .setDestinationUri(Uri.fromFile(dest))
-        val manager = context.getSystemService(DownloadManager::class.java)
-        val id = manager.enqueue(request)
-        val receiver = object : BroadcastReceiver() {
-            override fun onReceive(ctx: Context, intent: Intent) {
-                if (intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1) != id) return
-                context.unregisterReceiver(this)
-                if (!dest.exists()) {
-                    toast(context, "Update download failed")
-                    return
-                }
-                val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", dest)
-                val install = Intent(Intent.ACTION_VIEW)
-                    .setDataAndType(uri, "application/vnd.android.package-archive")
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                context.startActivity(install)
-            }
-        }
-        // Context.registerReceiver's 3-arg (flags) overload only exists on API
-        // 33+ -- this app's minSdk is 29, so that overload doesn't exist to
-        // call at all on older devices (not just a flag value question).
-        // ContextCompat backports it correctly across the whole range.
-        androidx.core.content.ContextCompat.registerReceiver(
-            context, receiver, IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE),
-            androidx.core.content.ContextCompat.RECEIVER_EXPORTED,
-        )
-        logger(context).log("downloading update APK from $apkUrl")
-    }
 
     private fun notify(context: Context, info: UpdateInfo) {
         val manager = context.getSystemService(NotificationManager::class.java)
