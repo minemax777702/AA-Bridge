@@ -59,9 +59,11 @@ private fun CompatibilityScreen(onBack: () -> Unit) {
     var exportFailed by remember { mutableStateOf(false) }
     val resultStore = remember(context) { context.getSharedPreferences("hu_test_results", android.content.Context.MODE_PRIVATE) }
     // Name is informational only; not a verified unique identifier.
-    val resultKey = "${evidence.protocol}|${evidence.name}|${auto}|${route}|${mic}|${gestures}"
+    val signature = "$auto|$route|$mic|$gestures"
+    val canRate = evidence.connected && evidence.appliedProfile == signature && evidence.screen.isNotBlank()
+    val resultKey = "${evidence.protocol}|${evidence.name}|$signature"
     var resultRevision by remember { mutableIntStateOf(0) }
-    val result = remember(resultKey, resultRevision) { resultStore.getString(resultKey, null) }
+
     fun applyProfile() {
         prefs.edit().putBoolean(AppSettings.HU_AUTO_KEY, auto).putString("aa_audio_route", route)
             .putBoolean("aa_carbit_mic", mic).putString(AppSettings.HU_GESTURES_KEY, gestures).apply()
@@ -127,16 +129,22 @@ private fun CompatibilityScreen(onBack: () -> Unit) {
                 EvidenceRow(R.string.hu_multitouch_observed, evidence.multiTouch.takeIf { it })
                 Text(stringResource(R.string.hu_message_count, evidence.messages), color = Dash.Muted)
                 Text(stringResource(R.string.hu_test_hint), style = MaterialTheme.typography.bodySmall, color = Dash.Muted)
-                if (result != null) Text(stringResource(if (result == "pass") R.string.hu_test_pass else R.string.hu_test_fail))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(enabled = evidence.connected, onClick = {
-                        resultStore.edit().putString(resultKey, "pass").apply(); resultRevision++
-                        DiagnosticLogger(context, "hu-compatibility").log("User verdict: pass; $resultKey")
-                    }, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.hu_test_pass)) }
-                    OutlinedButton(enabled = evidence.connected, onClick = {
-                        resultStore.edit().putString(resultKey, "fail").apply(); resultRevision++
-                        DiagnosticLogger(context, "hu-compatibility").log("User verdict: fail; $resultKey")
-                    }, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.hu_test_fail)) }
+                if (!canRate) Text(stringResource(R.string.hu_reconnect), color = Dash.Muted, style = MaterialTheme.typography.bodySmall)
+                listOf("music" to R.string.hu_check_music, "guidance" to R.string.hu_check_guidance,
+                    "voice" to R.string.hu_check_voice, "gestures" to R.string.hu_gestures).forEach { (key, label) ->
+                    val saved = remember(resultKey, key, resultRevision) { resultStore.getString("$resultKey|$key", null) }
+                    Text(stringResource(label) + if (saved == null) "" else " · " + stringResource(if (saved == "pass") R.string.hu_test_pass else R.string.hu_test_fail),
+                        style = MaterialTheme.typography.titleSmall)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(enabled = canRate, onClick = {
+                            resultStore.edit().putString("$resultKey|$key", "pass").apply(); resultRevision++
+                            DiagnosticLogger(context, "hu-compatibility").log("User verdict: $key pass; $resultKey")
+                        }, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.hu_test_pass)) }
+                        OutlinedButton(enabled = canRate, onClick = {
+                            resultStore.edit().putString("$resultKey|$key", "fail").apply(); resultRevision++
+                            DiagnosticLogger(context, "hu-compatibility").log("User verdict: $key fail; $resultKey")
+                        }, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.hu_test_fail)) }
+                    }
                 }
             }
             CompatibilityTile(R.string.hu_vehicle) {

@@ -12,6 +12,7 @@ internal object HuCompatibility {
     data class Evidence(
         val protocol: String = "",
         val connected: Boolean = false,
+        val appliedProfile: String = "",
         val name: String = "",
         val screen: String = "",
         val capabilities: String = "",
@@ -30,9 +31,9 @@ internal object HuCompatibility {
     private var written = 0
     private val recent = linkedMapOf<String, Pair<Int, Long>>()
 
-    @Synchronized fun start(token: Any, protocol: String) {
+    @Synchronized fun start(token: Any, protocol: String, appliedProfile: String) {
         owner = token
-        mutable.value = Evidence(protocol = protocol, connected = true)
+        mutable.value = Evidence(protocol = protocol, connected = true, appliedProfile = appliedProfile)
         recent.clear()
         written = 0
         windowStart = SystemClock.elapsedRealtime()
@@ -94,8 +95,13 @@ internal object HuCompatibility {
         }
         if (channel == "PXC" && ((cmd and 0xFF000000.toInt()) == 0x60000000 || cmd == 0x70000000 || cmd == 0x70000001)) return
         if (channel == "MIRROR" && (cmd == 0x20 || cmd == 0x40 || cmd == 0x72)) return
-        val json = if (body.size in 2..8192 && body.first() == '{'.code.toByte())
+        val json = if (body.size in 2..8192 && body.firstOrNull { it != 32.toByte() && it != 10.toByte() && it != 13.toByte() && it != 9.toByte() } == '{'.code.toByte())
             runCatching { JSONObject(String(body, Charsets.UTF_8)) }.getOrNull() else null
+        if (channel == "QD-JSON" && json?.optString("CMD") == "CAR_INFO") {
+            val para = json.optJSONObject("PARA")
+            if (para != null) e = e.copy(name = para.optString("CarName").take(100),
+                capabilities = runCatching { safeJson(para.optJSONObject("CarFeature") ?: JSONObject()).toString().take(1000) }.getOrDefault(""))
+        }
         if (channel == "PXC") when (cmd) {
             0x10010 -> if (json != null) e = e.copy(name = json.optString("HUName").take(100),
                 micDeclared = if (json.has("supportMic")) json.opt("supportMic") == true else null)
@@ -105,7 +111,7 @@ internal object HuCompatibility {
             0x200F1 -> e = e.copy(micAck = true)
         }
         val capture = AppSettings.huCapture(context)
-        val observed = if (capture && json != null) fields(json) else emptyMap()
+        val observed = if (capture && json != null) runCatching { fields(json) }.getOrDefault(emptyMap()) else emptyMap()
         val merged = (e.vehicleFields + observed).entries.toList().takeLast(64).associate { it.toPair() }
         mutable.value = e.copy(messages = (e.messages + 1).coerceAtMost(1_000_000), vehicleFields = merged)
         if (!capture) return
@@ -120,7 +126,7 @@ internal object HuCompatibility {
         if (recent.size >= 128 && id !in recent) recent.remove(recent.keys.first())
         recent[id] = fingerprint to now
         written++
-        val detail = if (json != null) " json=${safeJson(json).toString().take(3000)}" else
+        val detail = if (json != null) " json=${runCatching { safeJson(json).toString().take(3000) }.getOrDefault("[unavailable]")}" else
             if (channel == "MIRROR" || channel == "QD-BIN") " hex=${body.take(256).joinToString("") { "%02x".format(it.toInt() and 255) }}" else " payload=unclassified"
         logger.log("HU RX $id len=${body.size}$detail")
         if (observed.isNotEmpty()) logger.log("HU vehicle candidates (unverified): $observed")

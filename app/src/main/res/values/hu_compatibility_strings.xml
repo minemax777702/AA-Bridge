@@ -45,4 +45,7 @@
     <string name="hu_yes">Yes</string>
     <string name="hu_no">No</string>
     <string name="hu_unknown">Unknown</string>
+    <string name="hu_check_music">Music</string>
+    <string name="hu_check_guidance">Voice guidance</string>
+    <string name="hu_check_voice">Voice input</string>
 </resources>

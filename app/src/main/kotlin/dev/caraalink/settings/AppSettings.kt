@@ -162,6 +162,9 @@ object AppSettings {
 
     fun huCapture(context: Context): Boolean = dev.caraalink.BuildConfig.DEBUG && prefs(context).getBoolean(HU_CAPTURE_KEY, false)
     fun huAuto(context: Context): Boolean = prefs(context).getBoolean(HU_AUTO_KEY, false)
+    fun huProfileSignature(context: Context): String = prefs(context).let { p ->
+        "${p.getBoolean(HU_AUTO_KEY, false)}|${p.getString("aa_audio_route", "phone_direct")}|${p.getBoolean("aa_carbit_mic", false)}|${p.getString(HU_GESTURES_KEY, "AUTO")}"
+    }
     fun gestureMode(context: Context): GestureMode = if (huAuto(context)) GestureMode.AUTO else
         runCatching { GestureMode.valueOf(prefs(context).getString(HU_GESTURES_KEY, "AUTO") ?: "AUTO") }.getOrDefault(GestureMode.AUTO)
 

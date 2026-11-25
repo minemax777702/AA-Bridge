@@ -76,7 +76,7 @@ class CarSession(
                 accessoryModel = accessory.model, lastError = null)
         }
         gestureMode = dev.caraalink.settings.AppSettings.gestureMode(context)
-        hu.start(huToken, if (accessory.manufacturer == QdTransport.MANUFACTURER) "QDLink USB" else "CarbitLink USB")
+        hu.start(huToken, if (accessory.manufacturer == QdTransport.MANUFACTURER) "QDLink USB" else "CarbitLink USB", dev.caraalink.settings.AppSettings.huProfileSignature(context))
         features.start()
         transport = if (accessory.manufacturer == QdTransport.MANUFACTURER) {
             QdTransport(conn, logger, this, ::onTransportClosed).also { it.start() }
@@ -91,7 +91,7 @@ class CarSession(
         check(!emulatorMode || dev.caraalink.BuildConfig.DEBUG)
         lanTestBench = emulatorMode && emulatorLan != null
         gestureMode = dev.caraalink.settings.AppSettings.gestureMode(context)
-        hu.start(huToken, if (lanTestBench) "LAN test bench" else "CarbitLink Wi-Fi Direct")
+        hu.start(huToken, if (lanTestBench) "LAN test bench" else "CarbitLink Wi-Fi Direct", dev.caraalink.settings.AppSettings.huProfileSignature(context))
         if (!emulatorMode) features.start()
         val socket = SocketTransport(logger, channels(), ::onTransportClosed, emulatorMode, emulatorLan)
         transport = socket
@@ -478,7 +478,8 @@ class CarSession(
     override fun onTouch(action: Int, x: Int, y: Int) = onTouch(action, x, y, 0)
 
     @Synchronized override fun onTouch(action: Int, x: Int, y: Int, slot: Int) {
-        if (action == android.view.MotionEvent.ACTION_DOWN && slot in 0..31) {
+        if (slot !in 0..31) return
+        if (action == android.view.MotionEvent.ACTION_DOWN) {
             observedSlots.add(slot)
             if (observedSlots.size > 1) hu.multiTouch(huToken)
         } else if (action == android.view.MotionEvent.ACTION_UP) observedSlots.remove(slot)
@@ -502,7 +503,8 @@ class CarSession(
     }
 
     override fun onHuMessage(channel: String, command: Int, body: ByteArray) {
-        hu.receive(huToken, context, huLogger, channel, command, body)
+        runCatching { hu.receive(huToken, context, huLogger, channel, command, body) }
+            .onFailure { huLogger.log("HU diagnostic parse failed: ${it.javaClass.simpleName}") }
     }
 
     override fun onKey(key: Int) {

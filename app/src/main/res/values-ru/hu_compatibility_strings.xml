@@ -45,4 +45,7 @@
     <string name="hu_yes">Да</string>
     <string name="hu_no">Нет</string>
     <string name="hu_unknown">Неизвестно</string>
+    <string name="hu_check_music">Музыка</string>
+    <string name="hu_check_guidance">Голосовые подсказки</string>
+    <string name="hu_check_voice">Голосовой ввод</string>
 </resources>

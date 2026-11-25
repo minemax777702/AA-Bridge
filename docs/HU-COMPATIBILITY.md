@@ -1,0 +1,9 @@
+# Head-unit compatibility testing
+
+Settings → Head unit compatibility. Presets: Automatic, direct Android Auto sound, Bluetooth preferred, experimental CarbitLink PCM with phone microphone, experimental PCM with HU microphone, phone speaker with single touch. Manual settings cover four audio routes × two microphone preferences × three gesture choices. Automatic uses Bluetooth preference with phone fallback, only attempts HU microphone on an Android Auto voice request when HU explicitly advertises it, and uses native touch slots. PCM stays opt-in. Auto/multi touch use the same existing slot path; single-touch mode filters to one contact. QDLink's legacy single-contact path remains unchanged.
+
+Reconnect the physical head unit after profile changes. On a parked vehicle, test music, navigation prompts, a voice request, and pinch/touch. Mark each result independently. Results are local, keyed by observed protocol/name and selected profile (not a globally unique HU identity). ACK or PCM reception is protocol evidence, not proof of audible sound or intelligible speech.
+
+Debug only: enable Extended control capture, reconnect, export diagnostics. Capture inbound PXC, mirror control, QD JSON and selected QD binary headers; skips known PCM/video/touch/heartbeat payloads, caps logged previews and rate, redacts common identifier/secret field names. Unknown binary PXC payloads are metadata only. Nested JSON fields matching vehicle-state terms are recorded as **unverified candidates**. No undocumented probes, CAN commands, or fake parking values. A field absent from the wire cannot be obtained by this app. The existing diagnostic log rotation applies. Logs may still contain identifying or sensitive values; inspect before sharing. No automatic mic recording or uploads.
+
+Real-car parking restrictions remain untouched. GPS speed is not proof of parking. The feature cannot guarantee discovery of CAN/OBD data on a HU that never forwards them.
