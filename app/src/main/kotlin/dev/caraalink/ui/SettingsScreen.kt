@@ -127,7 +127,7 @@ private fun DashGroup(content: @Composable ColumnScope.() -> Unit) {
 
 @Composable
 private fun SettingsRow(icon: Painter, label: String, supporting: String? = null, onClick: () -> Unit) {
-    // Each label reads in its own script's direction (the support row is Arabic on every phone) but stays on the list's side.
+    // Each label reads in its own script's direction (the support row defaults to Arabic) but stays on the list's side.
     val side = if (LocalLayoutDirection.current == LayoutDirection.Ltr) TextAlign.Left else TextAlign.Right
     val own = TextStyle(textDirection = TextDirection.Content, textAlign = side)
     ListItem(

@@ -111,7 +111,7 @@ class CarStatusPresentation(
         setPadding(dp(12), 0, dp(12), 0)
     }
 
-    /** Monthly support page: Arabic text on the right, the two QR codes on the left. */
+    /** Monthly support page: text and payment code arranged for the message's script. */
     private fun supportPage(): View {
         val words = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
@@ -136,7 +136,7 @@ class CarStatusPresentation(
             }
         }
         return FrameLayout(context).apply {
-            layoutDirection = View.LAYOUT_DIRECTION_RTL
+            layoutDirection = if (resources.getBoolean(R.bool.support_rtl)) View.LAYOUT_DIRECTION_RTL else View.LAYOUT_DIRECTION_LTR
             setBackgroundColor(BACKGROUND)
             addView(row, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
         }

@@ -41,10 +41,13 @@ import dev.caraalink.R
 import dev.caraalink.support.SupportAsk
 import dev.caraalink.ui.theme.Dash
 
-/** The ask is Arabic on every phone, so it lays out right to left even on an English phone. */
+/** Match the support message's script, including the Arabic fallback on other phones. */
 @Composable
-private fun Rtl(content: @Composable () -> Unit) =
-    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl, content = content)
+private fun SupportLayout(content: @Composable () -> Unit) {
+    val rtl = LocalContext.current.resources.getBoolean(R.bool.support_rtl)
+    val direction = if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr
+    CompositionLocalProvider(LocalLayoutDirection provides direction, content = content)
+}
 
 /** The provider's own button look: its color with its logo. */
 @Composable
@@ -58,7 +61,7 @@ private fun LogoButton(logo: Int, brand: Color, description: Int, onClick: () ->
 /** The ask and the payment in one place: the monthly pop-up, the banner and Settings all open this. */
 @Composable
 fun SupportDialog(onDismiss: () -> Unit, onSupported: () -> Unit) = Dialog(onDismissRequest = onDismiss) {
-    Rtl {
+    SupportLayout {
         val uri = LocalUriHandler.current
         val context = LocalContext.current
         // InstaPay only works with an Egyptian bank; the link under the button fixes a wrong guess.
@@ -89,7 +92,7 @@ fun SupportDialog(onDismiss: () -> Unit, onSupported: () -> Unit) = Dialog(onDis
 }
 
 @Composable
-fun SupportBanner(onClick: () -> Unit, modifier: Modifier = Modifier) = Rtl {
+fun SupportBanner(onClick: () -> Unit, modifier: Modifier = Modifier) = SupportLayout {
     val ink = Color(0xFF032724)
     Row(
         modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Dash.Teal).clickable(onClick = onClick)

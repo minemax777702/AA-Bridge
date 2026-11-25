@@ -98,4 +98,17 @@
     <string name="tile_link">Связь</string>
     <string name="link_wireless_short">Без кабеля</string>
     <string name="link_cable_short">Кабель</string>
+    <string name="support_if_helped">Если приложение оказалось полезным</string>
+    <string name="support_popup_body">Я Али, разработчик AA Bridge. Приложение останется бесплатным. Если хотите, можете поддержать его на стоимость чашки кофе, например 50 или 100 египетских фунтов, либо на любую удобную сумму. Это необязательно, и добрые слова для меня не менее важны.</string>
+    <string name="support_action">Поддержать AA Bridge</string>
+    <string name="support_not_now">Не сейчас</string>
+    <string name="support_already">Уже поддержал</string>
+    <string name="support_thanks">Спасибо за поддержку AA Bridge!</string>
+    <string name="support_banner">Если приложение помогло, поддержите его на стоимость чашки кофе</string>
+    <string name="support_instapay">InstaPay (в Египте)</string>
+    <string name="support_paypal">PayPal (за пределами Египта)</string>
+    <string name="support_not_in_egypt">Вы не в Египте?</string>
+    <string name="support_in_egypt">Вы в Египте?</string>
+    <string name="car_support_line">Поддержите на стоимость чашки кофе, например 50 или 100 египетских фунтов</string>
+    <string name="car_support_open_aa">Открыть Android Auto</string>
 </resources>
