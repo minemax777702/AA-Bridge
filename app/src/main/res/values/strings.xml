@@ -110,4 +110,12 @@
     <string name="ui_connection_details">Connection details</string>
     <string name="ui_settings_advanced_summary">Display, audio, connection and diagnostics</string>
     <string name="ui_brand_name" translatable="false">AA Bridge</string>
+    <string name="lan_debug_title">LAN debugging</string>
+    <string name="lan_debug_summary">Connect the Windows emulator on a trusted local network. Traffic after authentication is not encrypted.</string>
+    <string name="lan_debug_start">Start debug session</string>
+    <string name="lan_debug_ip">IP: %1$s</string>
+    <string name="lan_debug_wait">Enter this 10-character code on the computer. Connect within 2 minutes.</string>
+    <string name="lan_debug_running">Debug session active or waiting for connection.</string>
+    <string name="lan_debug_disconnect">Disconnect the real car first.</string>
+    <string name="lan_debug_no_wifi">Connect the phone to Wi-Fi first.</string>
 </resources>

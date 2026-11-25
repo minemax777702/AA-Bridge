@@ -103,4 +103,12 @@
     <string name="ui_setup_later">Подключиться позже</string>
     <string name="ui_connection_details">Подключение</string>
     <string name="ui_settings_advanced_summary">Экран, звук, подключение и диагностика</string>
+    <string name="lan_debug_title">Отладка по Wi-Fi</string>
+    <string name="lan_debug_summary">Подключение Windows-эмулятора в доверенной локальной сети. После авторизации трафик не шифруется.</string>
+    <string name="lan_debug_start">Запустить сеанс отладки</string>
+    <string name="lan_debug_ip">IP: %1$s</string>
+    <string name="lan_debug_wait">Введите этот код из 10 символов на компьютере. Подключитесь в течение 2 минут.</string>
+    <string name="lan_debug_running">Сеанс отладки активен или ожидает подключения.</string>
+    <string name="lan_debug_disconnect">Сначала отключите автомобиль.</string>
+    <string name="lan_debug_no_wifi">Подключите телефон к Wi-Fi.</string>
 </resources>

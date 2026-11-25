@@ -40,6 +40,7 @@ private fun DeveloperTools(onBack: () -> Unit) {
     var clearing by remember { mutableStateOf(false) }
     SubScreen(stringResource(R.string.dev_tools), onBack) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            LanDebugCard()
             Surface(color = Dash.Tile, shape = RoundedCornerShape(20.dp)) {
                 Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(stringResource(R.string.dev_diagnostics), style = MaterialTheme.typography.titleMedium)

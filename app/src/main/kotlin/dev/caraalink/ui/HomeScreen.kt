@@ -135,10 +135,10 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenNearby: () -> Unit) {
     val serverRunning = rememberServerRunning()
     val connection = rememberConnection()
     val carConnected = connection.phase.isCarConnected()
-    val state = homeState(serverRunning, carConnected, connection.wireless)
+    val state = homeState(serverRunning, carConnected, if (connection.emulatorActive && !carConnected) WirelessPhase.CONNECTING else connection.wireless)
     val searchName = carToRetry(connection, AppSettings.wirelessCar(context))?.name
     val carName = connection.carName ?: searchName ?: stringResource(R.string.state_connected)
-    val title = when (state) {
+    val title = if (connection.emulatorActive) stringResource(R.string.lan_debug_title) else when (state) {
         HomeState.READY -> stringResource(R.string.home_ready_title)
         HomeState.NEEDS_TAP -> stringResource(R.string.home_needs_tap_title)
         HomeState.CONNECTED -> carName
@@ -147,7 +147,7 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenNearby: () -> Unit) {
             stringResource(R.string.home_failed_title, searchName ?: "") else stringResource(R.string.home_not_found_title)
         HomeState.WIFI_OFF -> stringResource(R.string.home_wifi_off_title)
     }
-    val body = when (state) {
+    val body = if (connection.emulatorActive) R.string.lan_debug_running else when (state) {
         HomeState.READY -> R.string.home_ready_body
         HomeState.NEEDS_TAP -> R.string.home_needs_tap_body
         HomeState.CONNECTED -> R.string.home_connected_body
@@ -174,7 +174,8 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenNearby: () -> Unit) {
                         MenuHint(stringResource(R.string.menu_start_server))
                         Spacer(Modifier.height(16.dp))
                     }
-                    HomeActions(state, connection, onOpenNearby)
+                    if (connection.emulatorActive) DashLink(stringResource(R.string.home_disconnect)) { stopLink(context) }
+                    else HomeActions(state, connection, onOpenNearby)
                 }
                 if (state == HomeState.NOT_FOUND) {
                     connection.suggestion?.let { found ->
@@ -191,7 +192,7 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenNearby: () -> Unit) {
                     HorizontalDivider(color = Dash.TileBorder)
                     val cable = carConnected && connection.link == CarLink.CABLE
                     ConnectionDetail(if (cable) R.drawable.ic_usb else R.drawable.ic_wifi, stringResource(R.string.tile_link),
-                        stringResource(if (!carConnected) R.string.ui_not_connected else if (cable) R.string.link_cable_short else R.string.link_wireless_short),
+                        stringResource(if (!carConnected) R.string.ui_not_connected else if (connection.emulatorActive) R.string.lan_debug_title else if (cable) R.string.link_cable_short else R.string.link_wireless_short),
                         carConnected)
                 }
                 Spacer(Modifier.height(24.dp))
