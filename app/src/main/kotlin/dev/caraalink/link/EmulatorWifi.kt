@@ -19,8 +19,8 @@ internal object EmulatorWifi {
             val caps = manager.getNetworkCapabilities(network)
             if (caps?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) != true ||
                 caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN)) return@firstNotNullOfOrNull null
-            manager.getLinkProperties(network)?.linkAddresses?.firstNotNullOfOrNull { link ->
-                val ip = link.address as? Inet4Address ?: return@firstNotNullOfOrNull null
+            manager.getLinkProperties(network)?.linkAddresses?.firstNotNullOfOrNull linkAddress@{ link ->
+                val ip = link.address as? Inet4Address ?: return@linkAddress null
                 if (ip.isLoopbackAddress || ip.isLinkLocalAddress || ip.isAnyLocalAddress ||
                     link.prefixLength !in 1..32) null else Endpoint(ip, link.prefixLength)
             }

@@ -123,6 +123,11 @@ class SocketTransport internal constructor(
             }
             val stream = SocketStream(nextId.getAndIncrement(), socket)
             streams += stream
+            if (!running.get()) {
+                stream.close()
+                streams -= stream
+                continue
+            }
             thread(name = "SocketTransport-read-$port", isDaemon = true) {
                 Process.setThreadPriority(Process.THREAD_PRIORITY_URGENT_DISPLAY)
                 readLoop(stream, handler, port)
