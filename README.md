@@ -36,7 +36,7 @@ The app runs on your phone. It starts a local Android Auto session and sends it 
 
 ## Download
 
-Review the [releases of this fork](https://github.com/minemax777702/AA-Bridge/releases). Automatic update checks are disabled by default; installation is manual. No signed release of this fork is implied by this documentation.
+Build the APK locally or use the GitHub Actions build artifacts. The app has no built-in update checker, download client, donation prompts or external website links.
 
 ## Setup
 

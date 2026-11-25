@@ -64,7 +64,6 @@
     <string name="nearby_permission_body">يحتاج AA Bridge إلى إذن الأجهزة القريبة للعثور على سيارتك.</string>
     <string name="settings_wireless_car">السيارة اللاسلكية</string>
     <string name="settings_forget">إزالة</string>
-    <string name="settings_updates">البحث عن تحديثات</string>
     <string name="settings_about">حول التطبيق</string>
     <string name="settings_advanced">إعدادات متقدمة</string>
     <string name="help_blank_q">شاشة السيارة لا تعرض شيئًا</string>
@@ -77,7 +76,6 @@
     <string name="made_by">من تطوير Ali Morgan</string>
     <string name="about_credit">مبني على CarAALink من تطوير JObersi10</string>
     <string name="about_license">مجاني ومفتوح المصدر، برخصة GPL-3.0</string>
-    <string name="about_source">الكود المصدري</string>
     <string name="fgs_channel">الاتصال بالسيارة</string>
     <string name="fgs_connecting">جارٍ الاتصال بسيارتك…</string>
     <string name="fgs_connected">متصل بسيارتك</string>

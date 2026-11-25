@@ -69,7 +69,6 @@
     <string name="nearby_permission_body">AA Bridge needs Nearby devices to find your car.</string>
     <string name="settings_wireless_car">Wireless car</string>
     <string name="settings_forget">Forget</string>
-    <string name="settings_updates">Check for updates</string>
     <string name="settings_about">About</string>
     <string name="settings_advanced">Advanced</string>
     <string name="help_blank_q">The car screen shows nothing</string>
@@ -82,7 +81,6 @@
     <string name="made_by">Made by Ali Morgan</string>
     <string name="about_credit">Based on CarAALink by JObersi10</string>
     <string name="about_license">Free and open source, GPL-3.0</string>
-    <string name="about_source">Source code</string>
     <string name="fgs_channel">Car connection</string>
     <string name="fgs_connecting">Connecting to your car…</string>
     <string name="fgs_connected">Connected to your car</string>
@@ -104,18 +102,4 @@
     <string name="link_wireless_short">Wireless</string>
     <string name="link_cable_short">Cable</string>
 
-    <!-- Support ask: Arabic on every phone, so these have no translations. -->
-    <string name="support_if_helped" translatable="false">لو الابلكيشن ساعدك واستفدت بيه</string>
-    <string name="support_popup_body" translatable="false">أنا علي، اللي عامل AA Bridge، وهيفضل مجاني. تقدر تدعمه بتمن فنجان قهوة، مثلاً 50 أو 100 جنيه، أو بأي مبلغ يريحك. ومفيش أي إلزام، ودعوة حلوة منك تفرق معايا زيها زي أي مبلغ.</string>
-    <string name="support_action" translatable="false">ادعم AA Bridge</string>
-    <string name="support_not_now" translatable="false">مش دلوقتي</string>
-    <string name="support_already" translatable="false">دعمت قبل كده</string>
-    <string name="support_thanks" translatable="false">شكرًا إنك دعمت AA Bridge.</string>
-    <string name="support_banner" translatable="false">لو الابلكيشن ساعدك، ادعمه بتمن فنجان قهوة</string>
-    <string name="support_instapay" translatable="false">InstaPay (داخل مصر)</string>
-    <string name="support_paypal" translatable="false">PayPal (خارج مصر)</string>
-    <string name="support_not_in_egypt" translatable="false">مش في مصر؟</string>
-    <string name="support_in_egypt" translatable="false">في مصر؟</string>
-    <string name="car_support_line" translatable="false">ادعمه بتمن فنجان قهوة، مثلاً 50 أو 100 جنيه</string>
-    <string name="car_support_open_aa" translatable="false">افتح Android Auto</string>
 </resources>
