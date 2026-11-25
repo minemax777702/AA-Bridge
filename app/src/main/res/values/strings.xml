@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name" translatable="false">AA Bridge</string>
+    <string name="app_name" translatable="false">AndroidAuto Bridge</string>
 
     <string name="car_waiting_title">Start Android Auto on your phone</string>
     <string name="car_waiting_body">Open Android Auto, tap ⋮, then Start head unit server.</string>

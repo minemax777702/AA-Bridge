@@ -186,5 +186,5 @@ object AppSettings {
         }
 
     fun updateAutoCheck(context: Context): Boolean =
-        prefs(context).getBoolean("update_auto_check", true)
+        prefs(context).getBoolean("update_auto_check", false)
 }

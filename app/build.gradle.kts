@@ -20,7 +20,7 @@ android {
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "io.github.alimorgaan.aabridge"
+        applicationId = "io.github.minemax777702.androidautobridge"
         minSdk = 29
         targetSdk = 34
         versionCode = 7
@@ -38,17 +38,6 @@ android {
     }
 
     signingConfigs {
-        // Committed on purpose (see .gitignore) so every debug build --
-        // local, CI, anyone's machine -- signs with the same key. Without
-        // this, each environment's auto-generated ~/.android/debug.keystore
-        // differs, so swapping a locally-built APK for a CI-built one (or
-        // vice versa) fails to install with INSTALL_FAILED_UPDATE_INCOMPATIBLE.
-        getByName("debug") {
-            storeFile = file("debug.keystore")
-            storePassword = "android"
-            keyAlias = "androiddebugkey"
-            keyPassword = "android"
-        }
         if (releaseKeys != null) create("release") {
             storeFile = file(releaseKeys.getProperty("storeFile"))
             storePassword = releaseKeys.getProperty("storePassword")

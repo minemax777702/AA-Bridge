@@ -24,11 +24,11 @@ import java.net.URL
 
 /**
  * Checks GitHub's latest tagged Release for something newer than this install,
- * downloads its APK asset and hands it to the system installer.
+ * opens the release page for manual review and installation.
  */
 object UpdateChecker {
 
-    private const val OWNER = "alimorgaan"
+    private const val OWNER = "minemax777702"
     private const val REPO = "AA-Bridge"
     private const val CHANNEL_ID = "app_updates"
     private const val NOTIFICATION_ID = 4
@@ -119,10 +119,10 @@ object UpdateChecker {
         AlertDialog.Builder(activity)
             .setTitle(info.title)
             .setMessage(
-                if (info.apkUrl != null) "Download and install now?" else "No APK attached to this release -- opening its GitHub page instead.",
+                "Open the release page on GitHub? Review and download the APK manually.",
             )
-            .setPositiveButton("Download") { _, _ ->
-                if (info.apkUrl != null) downloadAndInstall(context, info.apkUrl, info.title) else openPage(context, info.htmlUrl)
+            .setPositiveButton("Open GitHub") { _, _ ->
+                openPage(context, info.htmlUrl)
             }
             .setNegativeButton("Later", null)
             .show()
@@ -132,7 +132,7 @@ object UpdateChecker {
         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
 
     /**
-     * Downloads [apkUrl] via DownloadManager (so it survives the dialog
+     * Checks [apkUrl] via DownloadManager (so it survives the dialog
      * closing and shows its own progress notification), then on completion
      * either launches the system package installer directly (if this app
      * already has the "install unknown apps" grant) or sends the user to
@@ -193,7 +193,7 @@ object UpdateChecker {
             .setSmallIcon(dev.caraalink.R.drawable.ic_stat_bridge)
             .setContentTitle(info.title)
             .setSubText(context.getString(dev.caraalink.R.string.made_by))
-            .setContentText("Tap to download and install")
+            .setContentText("Tap to review the release")
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
             .build()

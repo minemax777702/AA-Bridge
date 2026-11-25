@@ -26,8 +26,8 @@ import dev.caraalink.R
 
 private const val AUTHOR_URL = "https://github.com/alimorgaan"
 private const val CREDIT_URL = "https://github.com/JObersi10/CarAALink"
-private const val LICENSE_URL = "https://github.com/alimorgaan/AA-Bridge/blob/main/LICENSE"
-private const val SOURCE_URL = "https://github.com/alimorgaan/AA-Bridge"
+private const val LICENSE_URL = "https://github.com/minemax777702/AA-Bridge/blob/main/LICENSE"
+private const val SOURCE_URL = "https://github.com/minemax777702/AA-Bridge"
 
 @Composable
 fun AboutScreen(onBack: () -> Unit) {
