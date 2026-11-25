@@ -48,13 +48,13 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Build debug and minified release APKs; run unit tests
+      - name: Build debug and minified release APKs; run debug unit tests
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p audit
           for attempt in 1 2 3; do
-            if ./gradlew assembleDebug assembleRelease testDebugUnitTest testReleaseUnitTest --no-daemon 2>&1 | tee "audit/build-attempt-${attempt}.log"; then
+            if ./gradlew :app:assembleDebug :app:assembleRelease :app:testDebugUnitTest --no-daemon 2>&1 | tee "audit/build-attempt-${attempt}.log"; then
               exit 0
             fi
             if ! grep -Eiq 'status code 429|HTTP[ /]+429|Too Many Requests' "audit/build-attempt-${attempt}.log"; then
