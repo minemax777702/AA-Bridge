@@ -43,4 +43,7 @@
     <string name="pref_developer_tools_summary">Log export, Car Preview</string>
     <string name="pref_aa_carbit_mic_title">CarbitLink car microphone (experimental)</string>
     <string name="pref_aa_carbit_mic_summary">Only in CarbitLink audio mode. Uses the car mic during Android Auto voice requests when supported, otherwise the phone or Bluetooth.</string>
+    <string name="pref_hu_emulator_title">Start HU emulator session</string>
+    <string name="pref_hu_emulator_summary">Debug only: listen on localhost via ADB for 2 minutes</string>
+    <string name="pref_hu_emulator_confirm">Disconnect any real car first. Use only a trusted ADB computer; stop the session when finished.</string>
 </resources>

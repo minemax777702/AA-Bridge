@@ -147,6 +147,7 @@ class UsbLinkForegroundService : Service() {
             ACTION_START_SESSION -> {
                 handleStart(intent) { accessory -> beginSession(accessory) }
             }
+            ACTION_START_EMULATOR -> if (dev.caraalink.BuildConfig.DEBUG) beginEmulator()
             ACTION_START_WIRELESS -> {
                 val address = intent.getStringExtra(EXTRA_CAR_ADDRESS)
                 val target = address?.let { RememberedCar(intent.getStringExtra(EXTRA_CAR_NAME) ?: it, it) }
@@ -335,6 +336,42 @@ class UsbLinkForegroundService : Service() {
 
     private fun hasFineLocation() =
         checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+    /** Explicit foreground-only development entry point. No LAN or P2P listener is widened. */
+    private fun beginEmulator() {
+        if (!dev.caraalink.BuildConfig.DEBUG || session != null || wirelessLink != null ||
+            pendingAccessory != null || sniffer != null || adbProbe != null) return
+        try {
+            startForegroundWithMic()
+        } catch (e: SecurityException) {
+            phoneLog.log("HU emulator foreground start refused: $e")
+            stopSelf()
+            return
+        }
+        stopping = false
+        acquireWakeLock()
+        lateinit var s: CarSession
+        s = CarSession(this, null) { _ ->
+            handler.post {
+                if (session === s) {
+                    session = null
+                    stopSelfCleanly()
+                }
+            }
+        }
+        session = s
+        ConnectionStateHolder.update {
+            it.copy(link = CarLink.NONE, wireless = WirelessPhase.IDLE,
+                phase = ConnectionPhase.DISCONNECTED, carName = null, lastError = null)
+        }
+        s.startWireless(emulatorMode = true)
+        handler.postDelayed({
+            if (session === s && ConnectionStateHolder.snapshot.phase != ConnectionPhase.STREAMING) {
+                phoneLog.log("HU emulator connection timeout")
+                stopSelfCleanly()
+            }
+        }, 120_000L)
+    }
 
     // --- wireless ---
 
@@ -675,6 +712,7 @@ class UsbLinkForegroundService : Service() {
         internal fun afterFailedAttempt(reconnectUntil: Long, now: Long): WirelessPhase? =
             if (now < reconnectUntil) null else WirelessPhase.FAILED
 
+        const val ACTION_START_EMULATOR = "dev.caraalink.service.action.START_EMULATOR"
         const val ACTION_START_WIRELESS = "dev.caraalink.service.action.START_WIRELESS"
         const val EXTRA_CAR_ADDRESS = "car_address"
         const val EXTRA_CAR_NAME = "car_name"

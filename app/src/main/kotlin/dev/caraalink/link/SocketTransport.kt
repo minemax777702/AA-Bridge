@@ -25,6 +25,7 @@ class SocketTransport(
     private val logger: DiagnosticLogger,
     private val handlerFor: (service: String) -> AdbTransport.StreamHandler?,
     private val onClosed: (reason: String) -> Unit,
+    private val emulatorMode: Boolean = false,
 ) : CarTransport {
 
     private val running = AtomicBoolean(false)
@@ -34,16 +35,24 @@ class SocketTransport(
     private val dispatch = Any()
 
     fun start() {
+        check(!emulatorMode || dev.caraalink.BuildConfig.DEBUG)
         if (!running.compareAndSet(false, true)) return
         for (port in PORTS) {
             val server = try {
-                ServerSocket().apply { reuseAddress = true; bind(InetSocketAddress(port)) }
+                ServerSocket().apply {
+                    reuseAddress = true
+                    bind(if (emulatorMode) InetSocketAddress("127.0.0.1", port) else InetSocketAddress(port))
+                }
             } catch (e: IOException) {
                 logger.log("listen on $port failed: ${e.message}")
                 continue
             }
             servers += server
             thread(name = "SocketTransport-accept-$port", isDaemon = true) { acceptLoop(server, port) }
+        }
+        if (emulatorMode && servers.size != PORTS.size) {
+            stop("HU emulator ports unavailable")
+            return
         }
         listening = servers.isNotEmpty()
         logger.log("listening on ${servers.joinToString { it.localPort.toString() }}")
@@ -62,7 +71,9 @@ class SocketTransport(
         while (running.get()) {
             val socket = try { server.accept() } catch (e: IOException) { break }
             val iface = runCatching { java.net.NetworkInterface.getByInetAddress(socket.localAddress)?.name }.getOrNull()
-            if (!acceptsInterface(iface)) {
+            val allowed = if (emulatorMode) socket.inetAddress.isLoopbackAddress && socket.localAddress.isLoopbackAddress
+                else acceptsInterface(iface)
+            if (!allowed) {
                 logger.log("refused tcp:$port from ${socket.remoteSocketAddress} on $iface")
                 runCatching { socket.close() }
                 continue
@@ -94,7 +105,7 @@ class SocketTransport(
             while (true) {
                 val n = input.read(buf)
                 if (n < 0) break
-                if (reads++ < 2) logger.logBytes("RX tcp:$port", buf, n)
+                if (!emulatorMode && reads++ < 2) logger.logBytes("RX tcp:$port", buf, n)
                 synchronized(dispatch) { handler.onData(stream, buf.copyOf(n)) }
             }
         } catch (e: IOException) {

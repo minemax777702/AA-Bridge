@@ -43,4 +43,7 @@
     <string name="pref_developer_tools_summary">Экспорт журналов, предпросмотр экрана автомобиля</string>
     <string name="pref_aa_carbit_mic_title">Микрофон автомобиля через CarbitLink (экспериментально)</string>
     <string name="pref_aa_carbit_mic_summary">Только в режиме звука CarbitLink. Использует микрофон автомобиля по запросу Android Auto, если он поддерживается, иначе микрофон телефона или Bluetooth.</string>
+    <string name="pref_hu_emulator_title">Запустить сеанс эмулятора ГУ</string>
+    <string name="pref_hu_emulator_summary">Только debug: ожидание подключения через ADB (localhost), 2 минуты</string>
+    <string name="pref_hu_emulator_confirm">Сначала отключите автомобиль. Используйте доверенный компьютер с ADB; после теста остановите сеанс.</string>
 </resources>

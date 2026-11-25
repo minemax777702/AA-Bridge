@@ -25,7 +25,7 @@ internal object Wire {
         val total = head.int
         val check = head.int
         val extra = head.int
-        require(total in 16..MAX_FRAME + 16 && check == command xor total) { "Invalid PXC header" }
+        require(total in 16..MAX_FRAME + 16 && check == (command xor total)) { "Invalid PXC header" }
         return Packet(command, extra, input.readExactly(total - 16))
     }
 
@@ -46,7 +46,7 @@ internal object Wire {
         require(width in 16..2560 && height in 16..1600 && fps in 1..60)
         return little(32).putShort(width.toShort()).putShort(height.toShort())
             .putInt(fps).putInt(2).putInt(0).putShort(0).putShort(0)
-            .putInt(4_194_304).put(0).put(1).put(if (width >= height) 1 else 0)
+            .putInt(4_194_304).put(0).put(1).put((if (width >= height) 1 else 0).toByte())
             .put(0).put(0).put(0).putShort(0).array()
     }
 

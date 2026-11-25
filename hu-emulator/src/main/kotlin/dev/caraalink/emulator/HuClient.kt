@@ -47,6 +47,7 @@ internal class HuClient(
         val caps = JSONObject().put("music", config.music).put("tts", config.tts)
             .put("vr", config.vr).put("talkie", config.talkie).put("autoChangeToBT", false)
         request(c2p, 0x10020, caps.toString().toByteArray())
+        c2p.socket.soTimeout = 0 // Mic ACKs are absent while the assistant is idle.
         worker("c2p-read") { while (running.get()) Wire.readPxc(c2p.input) }
         worker("p2c-read") { while (running.get()) handleP2c(p2c, c2p, Wire.readPxc(p2c.input)) }
         val control = connect(Wire.CONTROL)
@@ -63,6 +64,7 @@ internal class HuClient(
         control.write(Wire.mirror(0x70))
         check(Wire.readMirror(control.input).command == 0x71) { "Video start rejected" }
         val video = connect(Wire.VIDEO)
+        video.socket.soTimeout = 0
         ctrl = control
         log("Connected: H.264 ${width}×${height}; $caps")
         worker("control-read") { while (running.get()) Wire.readMirror(control.input) }

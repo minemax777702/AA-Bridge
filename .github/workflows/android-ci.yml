@@ -103,6 +103,30 @@ jobs:
           "$tools/aapt" dump permissions "$apk" | tee audit/apk-permissions.txt
           if grep -q 'android.permission.REQUEST_INSTALL_PACKAGES' audit/apk-permissions.txt; then exit 1; fi
 
+      - name: Scan and verify HU emulator APK
+        run: |
+          set -euo pipefail
+          apk="hu-emulator/build/outputs/apk/debug/hu-emulator-debug.apk"
+          test -f "$apk"
+          scan_dir="$(mktemp -d)"
+          unzip -q "$apk" -d "$scan_dir"
+          clamscan --recursive --infected --max-filesize=100M --max-scansize=400M "$apk" "$scan_dir" | tee audit/hu-emulator-clamav.txt
+          tools="$ANDROID_HOME/build-tools/36.0.0"
+          "$tools/apksigner" verify --verbose --print-certs "$apk" | tee audit/hu-emulator-signature.txt
+          "$tools/aapt" dump permissions "$apk" | tee audit/hu-emulator-permissions.txt
+          if grep -q 'android.permission.REQUEST_INSTALL_PACKAGES' audit/hu-emulator-permissions.txt; then exit 1; fi
+          mkdir -p dist-hu
+          cp "$apk" dist-hu/CarbitLink-HU-Emulator-debug.apk
+          (cd dist-hu && sha256sum CarbitLink-HU-Emulator-debug.apk > SHA256SUMS.txt)
+
+      - name: Upload HU emulator debug APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: CarbitLink-HU-Emulator-debug-${{ github.run_number }}
+          path: dist-hu/
+          if-no-files-found: error
+          retention-days: 30
+
       - name: Upload security reports
         if: always()
         uses: actions/upload-artifact@v7

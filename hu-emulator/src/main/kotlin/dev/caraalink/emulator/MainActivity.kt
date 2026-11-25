@@ -67,8 +67,8 @@ class MainActivity : Activity() {
             override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
                 val w = View.MeasureSpec.getSize(widthMeasureSpec)
                 val h = View.MeasureSpec.getSize(heightMeasureSpec)
-                val scale = minOf(w.toFloat() / width, h.toFloat() / height)
-                setMeasuredDimension((width * scale).toInt(), (height * scale).toInt())
+                val scale = minOf(w.toFloat() / this@MainActivity.width, h.toFloat() / this@MainActivity.height)
+                setMeasuredDimension((this@MainActivity.width * scale).toInt(), (this@MainActivity.height * scale).toInt())
             }
         }
         // Keep the content rectangle and touch coordinate mapping identical.
@@ -134,6 +134,7 @@ class MainActivity : Activity() {
 
     private fun resetUi() {
         client = null; contacts.clear(); connect.text = "Подключить"; setConfigEnabled(true)
+        status.append("\nОтключено")
     }
 
     private fun disconnect() {

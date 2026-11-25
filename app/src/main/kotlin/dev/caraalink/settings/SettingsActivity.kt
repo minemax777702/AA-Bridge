@@ -55,6 +55,24 @@ class SettingsActivity : AppCompatActivity() {
         override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
             setPreferencesFromResource(dev.caraalink.R.xml.root_preferences, rootKey)
             updateDpiSummary()
+            findPreference<Preference>("start_hu_emulator")?.apply {
+                isVisible = dev.caraalink.BuildConfig.DEBUG
+                setOnPreferenceClickListener {
+                    val context = requireContext()
+                    if (dev.caraalink.BuildConfig.DEBUG) {
+                        android.app.AlertDialog.Builder(context)
+                            .setTitle(R.string.pref_hu_emulator_title)
+                            .setMessage(R.string.pref_hu_emulator_confirm)
+                            .setPositiveButton(android.R.string.ok) { _, _ ->
+                                val intent = Intent(context, dev.caraalink.service.UsbLinkForegroundService::class.java)
+                                    .setAction(dev.caraalink.service.UsbLinkForegroundService.ACTION_START_EMULATOR)
+                                context.startForegroundService(intent)
+                            }
+                            .setNegativeButton(android.R.string.cancel, null).show()
+                    }
+                    true
+                }
+            }
 
             findPreference<Preference>("developer_tools")?.setOnPreferenceClickListener {
                 startActivity(Intent(requireContext(), dev.caraalink.diagnostics.DeveloperToolsActivity::class.java))

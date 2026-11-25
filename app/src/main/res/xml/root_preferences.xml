@@ -129,6 +129,10 @@
             android:summary="@string/pref_auto_save_crash_log_summary"
             android:defaultValue="true" />
         <Preference
+            android:key="start_hu_emulator"
+            android:title="@string/pref_hu_emulator_title"
+            android:summary="@string/pref_hu_emulator_summary" />
+        <Preference
             android:key="developer_tools"
             android:title="@string/pref_developer_tools_title"
             android:summary="@string/pref_developer_tools_summary" />
