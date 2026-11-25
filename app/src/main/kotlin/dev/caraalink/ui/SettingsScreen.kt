@@ -58,6 +58,7 @@ import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.LayoutDirection
 import dev.caraalink.R
 import dev.caraalink.settings.SettingsActivity
+import dev.caraalink.settings.HuCompatibilityActivity
 
 /** Page with a back arrow and a title; Settings, Help and About share it. */
 @Composable
@@ -84,6 +85,11 @@ fun SettingsScreen(onBack: () -> Unit, onHelp: () -> Unit, onAbout: () -> Unit) 
             SettingsRow(painterResource(R.drawable.ic_tune), stringResource(R.string.settings_advanced),
                 stringResource(R.string.ui_settings_advanced_summary)) {
                 context.startActivity(Intent(context, SettingsActivity::class.java))
+            }
+            HorizontalDivider(Modifier.padding(start = 68.dp), color = Dash.TileBorder)
+            SettingsRow(painterResource(R.drawable.ic_car), stringResource(R.string.hu_compat_title),
+                stringResource(R.string.hu_compat_summary)) {
+                context.startActivity(Intent(context, HuCompatibilityActivity::class.java))
             }
         }
         DashGroup {

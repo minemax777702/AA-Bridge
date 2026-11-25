@@ -165,7 +165,9 @@ object AppSettings {
     fun gestureMode(context: Context): GestureMode = if (huAuto(context)) GestureMode.AUTO else
         runCatching { GestureMode.valueOf(prefs(context).getString(HU_GESTURES_KEY, "AUTO") ?: "AUTO") }.getOrDefault(GestureMode.AUTO)
 
-    fun carbitMicEnabled(context: Context): Boolean = !huAuto(context) && prefs(context).getBoolean("aa_carbit_mic", false)
+    fun carbitMicEnabled(context: Context): Boolean = if (huAuto(context)) {
+        dev.caraalink.diagnostics.HuCompatibility.state.value.let { it.connected && it.micDeclared == true }
+    } else prefs(context).getBoolean("aa_carbit_mic", false)
 
     fun aaAudioRoute(context: Context): AaAudioRoute =
         if (huAuto(context)) AaAudioRoute.BT_PREFERRED else when (prefs(context).getString("aa_audio_route", "phone_direct")) {

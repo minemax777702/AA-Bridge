@@ -79,7 +79,6 @@ private fun AdvancedSettings(onBack: () -> Unit) {
 
     val custom = string("video_resolution_mode", "auto") == "custom"
     val autoDpi = bool("video_dpi_auto", true)
-    val carbitAudio = string("aa_audio_route", "phone_direct") == "carbit_experimental"
     val gpsPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
         setBool(AppSettings.PHONE_GPS_SPEED_KEY, result[android.Manifest.permission.ACCESS_FINE_LOCATION] == true)
     }
@@ -127,14 +126,6 @@ private fun AdvancedSettings(onBack: () -> Unit) {
             if (string("aa_fill_mode", "fit") == "fit") {
                 ToggleSetting(stringResource(R.string.pref_aa_auto_crop_title), stringResource(R.string.pref_aa_auto_crop_summary),
                     bool("aa_auto_crop", true)) { setBool("aa_auto_crop", it) }
-            }
-        }
-        SettingsSection(R.string.pref_aa_audio_route_title) {
-            ChoiceSetting(R.string.pref_aa_audio_route_title, R.string.pref_aa_audio_route_summary,
-                string("aa_audio_route", "phone_direct"), R.array.aa_audio_route_entries, R.array.aa_audio_route_values) { setString("aa_audio_route", it) }
-            if (carbitAudio) {
-                ToggleSetting(stringResource(R.string.pref_aa_carbit_mic_title), stringResource(R.string.pref_aa_carbit_mic_summary),
-                    bool("aa_carbit_mic", false)) { setBool("aa_carbit_mic", it) }
             }
         }
         SettingsSection(R.string.pref_category_android_auto_title) {

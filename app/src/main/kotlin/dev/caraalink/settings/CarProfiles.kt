@@ -29,6 +29,8 @@ object CarProfiles {
         "aa_auto_crop" to true,
         "aa_audio_route" to "phone_direct",
         "aa_carbit_mic" to false,
+        AppSettings.HU_AUTO_KEY to false,
+        AppSettings.HU_GESTURES_KEY to "AUTO",
     )
 
     private fun store(context: Context) = context.getSharedPreferences(PREFS_FILE, Context.MODE_PRIVATE)
@@ -54,6 +56,7 @@ object CarProfiles {
         val snapshot = JSONObject(json)
         val defaults = AppSettings.prefs(context)
         val editor = defaults.edit()
+        if (!snapshot.has(AppSettings.HU_AUTO_KEY) && snapshot.has("aa_audio_route")) editor.putBoolean(AppSettings.HU_AUTO_KEY, false)
         for ((key, default) in PROFILE_DEFAULTS) {
             // Old profiles did not include every key; retain their existing behavior.
             if (!snapshot.has(key)) continue

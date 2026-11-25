@@ -1,0 +1,192 @@
+package dev.caraalink.settings
+
+import android.content.Intent
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import dev.caraalink.BuildConfig
+import dev.caraalink.R
+import dev.caraalink.diagnostics.DiagnosticLogger
+import dev.caraalink.diagnostics.HuCompatibility
+import dev.caraalink.ui.SubScreen
+import dev.caraalink.ui.theme.AaBridgeTheme
+import dev.caraalink.ui.theme.Dash
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+
+class HuCompatibilityActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        enableEdgeToEdge(SystemBarStyle.dark(android.graphics.Color.TRANSPARENT), SystemBarStyle.dark(android.graphics.Color.TRANSPARENT))
+        setContent { AaBridgeTheme { CompatibilityScreen { finish() } } }
+    }
+}
+
+private data class TestProfile(val title: Int, val route: String, val remoteMic: Boolean, val gestures: String, val auto: Boolean = false)
+private val profiles = listOf(
+    TestProfile(R.string.hu_profile_auto, "bt_preferred", false, "AUTO", true),
+    TestProfile(R.string.hu_profile_phone, "phone_direct", false, "MULTI"),
+    TestProfile(R.string.hu_profile_bt, "bt_preferred", false, "MULTI"),
+    TestProfile(R.string.hu_profile_pcm, "carbit_experimental", false, "MULTI"),
+    TestProfile(R.string.hu_profile_pcm_mic, "carbit_experimental", true, "MULTI"),
+    TestProfile(R.string.hu_profile_legacy, "device_only", false, "SINGLE"),
+)
+
+@Composable
+private fun CompatibilityScreen(onBack: () -> Unit) {
+    val context = LocalContext.current
+    val prefs = remember(context) { AppSettings.prefs(context) }
+    var auto by remember { mutableStateOf(AppSettings.huAuto(context)) }
+    var route by remember { mutableStateOf(prefs.getString("aa_audio_route", "phone_direct") ?: "phone_direct") }
+    var mic by remember { mutableStateOf(prefs.getBoolean("aa_carbit_mic", false)) }
+    var gestures by remember { mutableStateOf(prefs.getString(AppSettings.HU_GESTURES_KEY, "AUTO") ?: "AUTO") }
+    var capture by remember { mutableStateOf(AppSettings.huCapture(context)) }
+    val evidence by HuCompatibility.state.collectAsState()
+    val scope = rememberCoroutineScope()
+    var exporting by remember { mutableStateOf(false) }
+    var exportFailed by remember { mutableStateOf(false) }
+    val resultStore = remember(context) { context.getSharedPreferences("hu_test_results", android.content.Context.MODE_PRIVATE) }
+    // Name is informational only; not a verified unique identifier.
+    val resultKey = "${evidence.protocol}|${evidence.name}|${auto}|${route}|${mic}|${gestures}"
+    var resultRevision by remember { mutableIntStateOf(0) }
+    val result = remember(resultKey, resultRevision) { resultStore.getString(resultKey, null) }
+    fun applyProfile() {
+        prefs.edit().putBoolean(AppSettings.HU_AUTO_KEY, auto).putString("aa_audio_route", route)
+            .putBoolean("aa_carbit_mic", mic).putString(AppSettings.HU_GESTURES_KEY, gestures).apply()
+        DiagnosticLogger(context, "hu-compatibility").log("Profile selected: auto=$auto audio=$route remoteMic=$mic gestures=$gestures; reconnect HU")
+    }
+    fun select(profile: TestProfile) {
+        auto = profile.auto
+        route = profile.route
+        mic = profile.remoteMic
+        gestures = profile.gestures
+        applyProfile()
+    }
+    SubScreen(stringResource(R.string.hu_compat_title), onBack) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            CompatibilityTile(R.string.hu_profiles) {
+                Text(stringResource(R.string.hu_reconnect), color = Dash.Muted, style = MaterialTheme.typography.bodySmall)
+                profiles.forEach { profile ->
+                    val selected = if (auto) profile.auto else !profile.auto && route == profile.route && mic == profile.remoteMic && gestures == profile.gestures
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(selected = selected, onClick = { select(profile) })
+                        TextButton(onClick = { select(profile) }) { Text(stringResource(profile.title)) }
+                    }
+                }
+            }
+            CompatibilityTile(R.string.hu_manual) {
+                if (auto) Text(stringResource(R.string.hu_auto_summary), color = Dash.Muted)
+                val routes = listOf("phone_direct" to R.string.hu_audio_phone_direct,
+                    "bt_preferred" to R.string.hu_audio_bluetooth, "device_only" to R.string.hu_audio_device,
+                    "carbit_experimental" to R.string.hu_audio_pcm)
+                Text(stringResource(R.string.pref_aa_audio_route_title), style = MaterialTheme.typography.titleSmall)
+                routes.forEach { (value, label) ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(selected = !auto && route == value, onClick = { auto = false; route = value; applyProfile() })
+                        TextButton(onClick = { auto = false; route = value; applyProfile() }) { Text(stringResource(label)) }
+                    }
+                }
+                HorizontalDivider(color = Dash.TileBorder)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(stringResource(R.string.hu_mic_remote), modifier = Modifier.weight(1f))
+                    Switch(checked = if (auto) evidence.micDeclared == true else mic, onCheckedChange = {
+                        auto = false; mic = it; applyProfile()
+                    })
+                }
+                Text(stringResource(R.string.hu_mic_fallback), color = Dash.Muted, style = MaterialTheme.typography.bodySmall)
+                Text(stringResource(R.string.hu_gestures), style = MaterialTheme.typography.titleSmall)
+                listOf("AUTO" to R.string.hu_gesture_auto, "MULTI" to R.string.hu_gesture_multi, "SINGLE" to R.string.hu_gesture_single).forEach { (value, label) ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(selected = (if (auto) "AUTO" else gestures) == value, onClick = { auto = false; gestures = value; applyProfile() })
+                        TextButton(onClick = { auto = false; gestures = value; applyProfile() }) { Text(stringResource(label)) }
+                    }
+                }
+            }
+            CompatibilityTile(R.string.hu_detected) {
+                Text(stringResource(if (evidence.connected) R.string.hu_connected else R.string.hu_last_session), color = Dash.Muted)
+                Text(evidence.protocol.ifBlank { "—" })
+                if (evidence.name.isNotBlank()) Text(evidence.name)
+                if (evidence.screen.isNotBlank()) Text(evidence.screen)
+                Text(evidence.capabilities.ifBlank { stringResource(R.string.hu_no_capabilities) })
+                EvidenceRow(R.string.hu_declared_mic, evidence.micDeclared)
+                EvidenceRow(R.string.hu_audio_ack, evidence.playbackAck.takeIf { it })
+                EvidenceRow(R.string.hu_mic_ack, evidence.micAck.takeIf { it })
+                EvidenceRow(R.string.hu_mic_pcm, evidence.micPcm.takeIf { it })
+                EvidenceRow(R.string.hu_multitouch_observed, evidence.multiTouch.takeIf { it })
+                Text(stringResource(R.string.hu_message_count, evidence.messages), color = Dash.Muted)
+                Text(stringResource(R.string.hu_test_hint), style = MaterialTheme.typography.bodySmall, color = Dash.Muted)
+                if (result != null) Text(stringResource(if (result == "pass") R.string.hu_test_pass else R.string.hu_test_fail))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(enabled = evidence.connected, onClick = {
+                        resultStore.edit().putString(resultKey, "pass").apply(); resultRevision++
+                        DiagnosticLogger(context, "hu-compatibility").log("User verdict: pass; $resultKey")
+                    }, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.hu_test_pass)) }
+                    OutlinedButton(enabled = evidence.connected, onClick = {
+                        resultStore.edit().putString(resultKey, "fail").apply(); resultRevision++
+                        DiagnosticLogger(context, "hu-compatibility").log("User verdict: fail; $resultKey")
+                    }, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.hu_test_fail)) }
+                }
+            }
+            CompatibilityTile(R.string.hu_vehicle) {
+                if (evidence.vehicleFields.isEmpty()) Text(stringResource(R.string.hu_no_vehicle_fields), color = Dash.Muted)
+                else evidence.vehicleFields.forEach { (key, value) -> Text("$key: $value", style = MaterialTheme.typography.bodySmall) }
+                Text(stringResource(R.string.hu_unverified), color = Dash.Muted, style = MaterialTheme.typography.bodySmall)
+            }
+            CompatibilityTile(R.string.hu_capture) {
+                if (BuildConfig.DEBUG) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(stringResource(R.string.hu_capture), modifier = Modifier.weight(1f))
+                        Switch(checked = capture, onCheckedChange = {
+                            capture = it
+                            prefs.edit().putBoolean(AppSettings.HU_CAPTURE_KEY, it).apply()
+                            DiagnosticLogger(context, "hu-compatibility").log("Extended control capture enabled=$it")
+                        })
+                    }
+                    Text(stringResource(R.string.hu_capture_summary), color = Dash.Muted, style = MaterialTheme.typography.bodySmall)
+                } else Text(stringResource(R.string.hu_capture_debug_only), color = Dash.Muted)
+                OutlinedButton(enabled = !exporting, modifier = Modifier.fillMaxWidth(), onClick = {
+                    exporting = true
+                    exportFailed = false
+                    scope.launch {
+                        try {
+                            val intent = withContext(Dispatchers.IO) { DiagnosticLogger(context, "hu-compatibility").shareAllLogsIntent() }
+                            context.startActivity(Intent.createChooser(intent, null))
+                        } catch (_: Exception) { exportFailed = true }
+                        finally { exporting = false }
+                    }
+                }) { Text(stringResource(R.string.home_send_logs)) }
+                if (exportFailed) Text(stringResource(R.string.hu_export_failed), color = Dash.Amber)
+            }
+        }
+    }
+}
+
+@Composable
+private fun CompatibilityTile(title: Int, content: @Composable ColumnScope.() -> Unit) {
+    Surface(color = Dash.Tile, shape = RoundedCornerShape(20.dp)) {
+        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(stringResource(title), style = MaterialTheme.typography.titleMedium)
+            content()
+        }
+    }
+}
+
+@Composable
+private fun EvidenceRow(label: Int, value: Boolean?) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(stringResource(label), modifier = Modifier.weight(1f))
+        Text(stringResource(when (value) { true -> R.string.hu_yes; false -> R.string.hu_no; null -> R.string.hu_unknown }), color = Dash.Muted)
+    }
+}
