@@ -48,6 +48,25 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
+      # A persistent private debug signing key makes APK updates compatible.
+      # Never expose the key in artifacts or use a production signing key here.
+      - name: Configure persistent debug signing
+        env:
+          DEBUG_KEYSTORE_BASE64: ${{ secrets.AA_BRIDGE_DEBUG_KEYSTORE_BASE64 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "$DEBUG_KEYSTORE_BASE64" ]; then
+            echo "::warning::No persistent debug signing key configured. This APK may require a fresh install."
+            echo "Debug APK: temporary signing key (updates are not guaranteed)." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          umask 077
+          mkdir -p "$HOME/.android"
+          printf '%s' "$DEBUG_KEYSTORE_BASE64" | base64 --decode > "$HOME/.android/debug.keystore"
+          keytool -list -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey >/dev/null
+          echo "Debug APK: persistent signing key configured." >> "$GITHUB_STEP_SUMMARY"
+
       - name: Build debug and minified release APKs; run debug unit tests
         shell: bash
         run: |
@@ -102,6 +121,10 @@ jobs:
           "$tools/apksigner" verify --verbose --print-certs "$apk" | tee audit/apk-signature.txt
           "$tools/aapt" dump permissions "$apk" | tee audit/apk-permissions.txt
           if grep -q 'android.permission.REQUEST_INSTALL_PACKAGES' audit/apk-permissions.txt; then exit 1; fi
+
+      - name: Remove CI signing key
+        if: always()
+        run: rm -f "$HOME/.android/debug.keystore"
 
       - name: Upload security reports
         if: always()
