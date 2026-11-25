@@ -14,7 +14,7 @@ Open Settings → Head unit compatibility → Diagnostics wizard. Identify the c
 
 ## Advanced tests
 
-The wizard has an expandable automatic/manual test panel. Exit Android Auto on the head unit without disconnecting, stop other playback and lower volume before running generated signals. System, speaker and Bluetooth use Android AudioTrack; PCM MUSIC (48 kHz stereo) and TTS (16 kHz mono) use existing negotiated CarbitLink streams only. No guessed formats, forced capability flags or audio recording. A successful send is not proof of audibility. Manual verdicts are logged. Auto sequence tests each route; each can also be invoked separately. The ordinary Android Auto functional tests remain required for recommendations.
+The wizard has an expandable automatic/manual test panel. Exit Android Auto on the head unit without disconnecting, stop other playback and lower volume before running generated signals. System, speaker and Bluetooth use Android AudioTrack; PCM MUSIC (48 kHz stereo) and TTS, VR, TALKIE (16 kHz mono) use existing negotiated CarbitLink streams only. No guessed formats, forced capability flags or audio recording. A successful send is not proof of audibility. Manual verdicts are logged. Auto sequence tests each route; each can also be invoked separately. The ordinary Android Auto functional tests remain required for recommendations.
 
 Calibration: nine targets on the real HU virtual display, five for fitting axis swap/inversion/scale/offset, four for independent validation. Correction is explicit, only for the current link, reset on disconnect or screen size change. Invalid fit cannot be applied. The panel can stop/reset calibration. This tests mirror coordinates, not Android Auto crop margins.
 

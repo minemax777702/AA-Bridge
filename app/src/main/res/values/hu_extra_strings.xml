@@ -35,4 +35,6 @@
     <string name="hu_extra_compare_run">Compare traces</string>
     <string name="hu_extra_diff_count">Different command inventories / lengths: %1$d</string>
     <string name="hu_extra_diff_limit">First 128 differences shown.</string>
+    <string name="hu_extra_pcm_vr">CarbitLink VR · mono 16 kHz</string>
+    <string name="hu_extra_pcm_talkie">CarbitLink TALKIE · mono 16 kHz</string>
 </resources>

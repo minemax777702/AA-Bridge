@@ -31,6 +31,7 @@ internal object HuTraceCompare {
     fun parse(text: String, truncated: Boolean = false): Trace {
         val commands = linkedMapOf<Key,MutableSet<Int>>()
         var recognized = 0
+        var inventoryLimited = false
         for (line in text.lineSequence().take(30000)) {
             val match = canonical.find(line)
             val legacy = if (match == null) pxc.find(line) else null
@@ -48,12 +49,12 @@ internal object HuTraceCompare {
                     code in listOf(0x10060,0x10061,0x70000000,0x70000001))) continue
             if (ch == "MIRROR" && code in listOf(0x20,0x40,0x41,0x72)) continue
             val key = Key(direction.uppercase(Locale.ROOT),ch,code)
-            if (commands.size >= 512 && key !in commands) continue
+            if (commands.size >= 512 && key !in commands) { inventoryLimited = true; continue }
             val lengths = commands.getOrPut(key) { linkedSetOf() }
-            if (lengths.size < 32) lengths.add(len)
+            if (lengths.size < 32) lengths.add(len) else if (len !in lengths) inventoryLimited = true
             recognized++
         }
-        return Trace(commands.mapValues { it.value.toSet() },recognized,truncated || text.count { it == '\n' } >= 30000)
+        return Trace(commands.mapValues { it.value.toSet() },recognized,truncated || inventoryLimited || text.count { it == '\n' } >= 30000)
     }
 
     fun compare(reference: Trace, bridge: Trace): List<Difference> =

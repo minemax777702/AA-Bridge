@@ -33,7 +33,6 @@ internal fun HuAdvancedTests(session: String, allowed: Boolean) {
     var traceError by remember { mutableStateOf(false) }
     var importing by remember { mutableStateOf(false) }
     var showDiff by remember { mutableStateOf(false) }
-    val ready = allowed && !busy && !tools.calibrating && HuDiagnosticTools.ready(session)
     // Readiness also depends on AA closing; refresh even if the connection snapshot did not change.
     var readyTick by remember { mutableIntStateOf(0) }
     LaunchedEffect(session) { while (true) { delay(500); readyTick++ } }
@@ -203,4 +202,6 @@ private fun signalLabel(route: HuTestSignal.Route): Int = when(route) {
     HuTestSignal.Route.BLUETOOTH -> R.string.hu_audio_bluetooth
     HuTestSignal.Route.PCM_MUSIC -> R.string.hu_extra_pcm_music
     HuTestSignal.Route.PCM_TTS -> R.string.hu_extra_pcm_tts
+    HuTestSignal.Route.PCM_VR -> R.string.hu_extra_pcm_vr
+    HuTestSignal.Route.PCM_TALKIE -> R.string.hu_extra_pcm_talkie
 }

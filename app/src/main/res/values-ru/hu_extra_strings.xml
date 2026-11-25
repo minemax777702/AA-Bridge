@@ -35,4 +35,6 @@
     <string name="hu_extra_compare_run">Сравнить журналы</string>
     <string name="hu_extra_diff_count">Различий в командах / длинах: %1$d</string>
     <string name="hu_extra_diff_limit">Показаны первые 128 различий.</string>
+    <string name="hu_extra_pcm_vr">CarbitLink VR · моно 16 кГц</string>
+    <string name="hu_extra_pcm_talkie">CarbitLink TALKIE · моно 16 кГц</string>
 </resources>

@@ -15,7 +15,7 @@ import kotlin.math.PI
 
 /** Short, low-amplitude synthetic tone; no volume changes and no voice recording. */
 internal object HuTestSignal {
-    enum class Route { SYSTEM, SPEAKER, BLUETOOTH, PCM_MUSIC, PCM_TTS }
+    enum class Route { SYSTEM, SPEAKER, BLUETOOTH, PCM_MUSIC, PCM_TTS, PCM_VR, PCM_TALKIE }
     data class Result(val sent: Boolean, val device: Int? = null, val frames: Int = 0)
     fun pcm(rate: Int, channels: Int, firstFrame: Int, frames: Int): ShortArray {
         require(rate in listOf(16000,48000) && channels in 1..2 && firstFrame >= 0 && frames in 1..rate*3)
@@ -34,9 +34,16 @@ internal object HuTestSignal {
     suspend fun play(context: Context, session: String, route: Route): Result {
         if (!HuDiagnosticTools.ready(session)) return Result(false)
         val logger = DiagnosticLogger(context,"hu-test-signal")
-        val result = if (route == Route.PCM_MUSIC || route == Route.PCM_TTS) {
+        val remoteStream = when(route) {
+            Route.PCM_MUSIC -> CarbitAudioTransport.Stream.MUSIC
+            Route.PCM_TTS -> CarbitAudioTransport.Stream.TTS
+            Route.PCM_VR -> CarbitAudioTransport.Stream.VR
+            Route.PCM_TALKIE -> CarbitAudioTransport.Stream.TALKIE
+            else -> null
+        }
+        val result = if (remoteStream != null) {
             val transport = HuDiagnosticTools.audio(session) ?: return Result(false)
-            val stream = if (route == Route.PCM_MUSIC) CarbitAudioTransport.Stream.MUSIC else CarbitAudioTransport.Stream.TTS
+            val stream = remoteStream
             if (!transport.diagnosticAvailable(stream)) return Result(false)
             var sent = 0
             try {

@@ -499,6 +499,9 @@ class CarSession(
         if (c.width <= 0 || c.height <= 0) return
         val raw = dev.caraalink.diagnostics.HuCalibration.Point(x.toDouble()/c.width, y.toDouble()/c.height)
         if (display.mode == CarDisplay.Mode.CALIBRATION || tools.state.value.calibrating) {
+            observedSlots.clear()
+            singleTouch.reset()
+            if (display.mode != CarDisplay.Mode.CALIBRATION) return
             if (action == android.view.MotionEvent.ACTION_DOWN && calibrationContact == null) {
                 calibrationContact = slot
                 tools.tap(huToken, raw)
