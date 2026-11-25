@@ -4,21 +4,16 @@ import android.app.AlertDialog
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
-import android.app.DownloadManager
-import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
 import android.net.Uri
 import android.os.Build
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
-import androidx.core.content.FileProvider
 import dev.caraalink.BuildConfig
 import dev.caraalink.diagnostics.DiagnosticLogger
 import dev.caraalink.settings.AppSettings
 import org.json.JSONObject
-import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -70,8 +65,23 @@ object UpdateChecker {
         val body = get("https://api.github.com/repos/$OWNER/$REPO/releases/latest") ?: return null
         val json = JSONObject(body)
         val tag = json.getString("tag_name").removePrefix("v")
-        if (tag == BuildConfig.VERSION_NAME) return null
+        if (!isNewerVersion(tag, BuildConfig.VERSION_NAME)) return null
         return UpdateInfo("Update available: v$tag", json.getString("html_url"), apkAssetUrl(json))
+    }
+
+    /** Accept only stable numeric release versions; reject older or malformed tags. */
+    internal fun isNewerVersion(candidate: String, current: String): Boolean {
+        fun parse(version: String): List<Int>? {
+            val parts = version.split('.')
+            if (parts.size != 3 || parts.any { it.isEmpty() || !it.all { ch -> ch in '0'..'9' } }) return null
+            return parts.map { it.toIntOrNull() ?: return null }
+        }
+        val next = parse(candidate) ?: return false
+        val installed = parse(current) ?: return false
+        for (i in next.indices) {
+            if (next[i] != installed[i]) return next[i] > installed[i]
+        }
+        return false
     }
 
     /** First `.apk` asset's direct download URL, or null if the release has none attached. */
