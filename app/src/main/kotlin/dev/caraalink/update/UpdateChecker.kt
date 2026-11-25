@@ -1,5 +1,7 @@
 package dev.caraalink.update
 
+import dev.caraalink.R
+
 import android.app.AlertDialog
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -34,7 +36,7 @@ object UpdateChecker {
     private const val NOTIFICATION_ID = 4
 
     /** [apkUrl] is null if the release has no `.apk` asset attached (nothing to auto-download). */
-    private data class UpdateInfo(val title: String, val htmlUrl: String, val apkUrl: String?)
+    private data class UpdateInfo(val version: String, val htmlUrl: String, val apkUrl: String?)
 
     private fun logger(context: Context) = DiagnosticLogger(context, "update-checker")
 
@@ -52,9 +54,9 @@ object UpdateChecker {
             logger(context).log("update check: ${result.exceptionOrNull() ?: outcome ?: "up to date"}")
             android.os.Handler(android.os.Looper.getMainLooper()).post {
                 when {
-                    result.isFailure -> if (manual) toast(context, "Update check failed: ${result.exceptionOrNull()?.message}")
+                    result.isFailure -> if (manual) toast(context, context.getString(R.string.update_check_failed, result.exceptionOrNull()?.message))
                     outcome != null -> promptUpdate(context, outcome)
-                    manual -> toast(context, "Already on the latest release")
+                    manual -> toast(context, context.getString(R.string.update_latest))
                 }
             }
         }, "UpdateChecker").start()
@@ -71,7 +73,7 @@ object UpdateChecker {
         val json = JSONObject(body)
         val tag = json.getString("tag_name").removePrefix("v")
         if (tag == BuildConfig.VERSION_NAME) return null
-        return UpdateInfo("Update available: v$tag", json.getString("html_url"), apkAssetUrl(json))
+        return UpdateInfo(tag, json.getString("html_url"), apkAssetUrl(json))
     }
 
     /** First `.apk` asset's direct download URL, or null if the release has none attached. */
@@ -117,14 +119,14 @@ object UpdateChecker {
         val activity = context as? android.app.Activity ?: return
         if (activity.isFinishing || activity.isDestroyed) return
         AlertDialog.Builder(activity)
-            .setTitle(info.title)
+            .setTitle(context.getString(R.string.update_available, info.version))
             .setMessage(
-                if (info.apkUrl != null) "Download and install now?" else "No APK attached to this release -- opening its GitHub page instead.",
+                if (info.apkUrl != null) context.getString(R.string.update_prompt) else context.getString(R.string.update_no_apk),
             )
-            .setPositiveButton("Download") { _, _ ->
-                if (info.apkUrl != null) downloadAndInstall(context, info.apkUrl, info.title) else openPage(context, info.htmlUrl)
+            .setPositiveButton(context.getString(R.string.update_download)) { _, _ ->
+                if (info.apkUrl != null) downloadAndInstall(context, info.apkUrl, context.getString(R.string.update_available, info.version)) else openPage(context, info.htmlUrl)
             }
-            .setNegativeButton("Later", null)
+            .setNegativeButton(context.getString(R.string.update_later), null)
             .show()
     }
 
@@ -146,7 +148,7 @@ object UpdateChecker {
         dest.delete()
         val request = DownloadManager.Request(Uri.parse(apkUrl))
             .setTitle(title)
-            .setDescription("Downloading AA Bridge update")
+            .setDescription(context.getString(R.string.update_downloading))
             .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
             .setDestinationUri(Uri.fromFile(dest))
         val manager = context.getSystemService(DownloadManager::class.java)
@@ -156,7 +158,7 @@ object UpdateChecker {
                 if (intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1) != id) return
                 context.unregisterReceiver(this)
                 if (!dest.exists()) {
-                    toast(context, "Update download failed")
+                    toast(context, context.getString(R.string.update_download_failed))
                     return
                 }
                 val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", dest)
@@ -181,7 +183,7 @@ object UpdateChecker {
         val manager = context.getSystemService(NotificationManager::class.java)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             manager.createNotificationChannel(
-                NotificationChannel(CHANNEL_ID, "App updates", NotificationManager.IMPORTANCE_DEFAULT),
+                NotificationChannel(CHANNEL_ID, context.getString(R.string.update_channel), NotificationManager.IMPORTANCE_DEFAULT),
             )
         }
         // Tapping the notification re-opens the app rather than a browser --
@@ -191,9 +193,9 @@ object UpdateChecker {
         val pendingIntent = PendingIntent.getActivity(context, 0, intent, PendingIntent.FLAG_IMMUTABLE)
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(dev.caraalink.R.drawable.ic_stat_bridge)
-            .setContentTitle(info.title)
+            .setContentTitle(context.getString(R.string.update_available, info.version))
             .setSubText(context.getString(dev.caraalink.R.string.made_by))
-            .setContentText("Tap to download and install")
+            .setContentText(context.getString(R.string.update_tap))
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
             .build()

@@ -651,7 +651,7 @@ class UsbLinkForegroundService : Service() {
     private fun cableStatus(snapshot: ConnectionSnapshot): String = when (snapshot.phase) {
         ConnectionPhase.STREAMING -> getString(R.string.fgs_connected)
         ConnectionPhase.ERROR -> getString(R.string.fgs_problem)
-        ConnectionPhase.SNIFFING -> "Diagnostic sniffer running (${snapshot.bytesRead} bytes)"
+        ConnectionPhase.SNIFFING -> getString(R.string.fgs_sniffing, snapshot.bytesRead)
         else -> getString(R.string.fgs_connecting)
     }
 

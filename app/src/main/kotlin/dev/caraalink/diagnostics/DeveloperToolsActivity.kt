@@ -1,5 +1,7 @@
 package dev.caraalink.diagnostics
 
+import dev.caraalink.R
+
 import android.app.Activity
 import android.content.Intent
 import android.content.res.ColorStateList
@@ -40,30 +42,29 @@ class DeveloperToolsActivity : Activity() {
         }
 
         root.addView(TextView(this).apply {
-            text = "Developer tools"
+            text = getString(R.string.dev_tools)
             setTextColor(Color.parseColor("#F2F5F7"))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 26f)
             setPadding(0, 0, 0, dp(20))
         })
 
-        root.addView(button("Export latest log") { exportLatestLog() })
-        root.addView(button("Save log to Downloads") { saveLogToDownloads() })
-        root.addView(button("Clear logs") { clearLogs() })
+        root.addView(button(getString(R.string.dev_export_log)) { exportLatestLog() })
+        root.addView(button(getString(R.string.dev_save_log)) { saveLogToDownloads() })
+        root.addView(button(getString(R.string.dev_clear_logs)) { clearLogs() })
 
-        root.addView(section("Car Preview: starts (or attaches to) a real Android Auto session on this " +
-            "phone, with decoded video and touch, for testing without the car."))
+        root.addView(section(getString(R.string.dev_preview_desc)))
 
-        root.addView(button("Car Preview") {
+        root.addView(button(getString(R.string.dev_preview)) {
             startActivity(Intent(this@DeveloperToolsActivity, dev.caraalink.aa.AaPreviewActivity::class.java))
         })
-        root.addView(button("Connection diagnostics") {
+        root.addView(button(getString(R.string.dev_diagnostics)) {
             startActivity(Intent(this@DeveloperToolsActivity, ConnectionDiagnosticsActivity::class.java))
         })
-        root.addView(button("Reset support asks") {
+        root.addView(button(getString(R.string.dev_reset_support)) {
             dev.caraalink.settings.AppSettings.resetSupportAsks(this)
-            Toast.makeText(this, "Support asks reset", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, getString(R.string.dev_support_reset), Toast.LENGTH_SHORT).show()
         })
-        root.addView(button("Save car support pages") {
+        root.addView(button(getString(R.string.dev_save_support)) {
             saveCarSupportPage(1024, 536, egypt = true) { saveCarSupportPage(768, 1024, egypt = true) {
                 saveCarSupportPage(1024, 536, egypt = false) { saveCarSupportPage(768, 1024, egypt = false) } } }
         })
@@ -100,7 +101,7 @@ class DeveloperToolsActivity : Activity() {
             page.dismiss()
             virtual.release()
             reader.close()
-            Toast.makeText(this, name?.let { "Saved $it to Downloads" } ?: "Car page capture failed", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, name?.let { getString(R.string.dev_saved_downloads, it) } ?: getString(R.string.dev_capture_failed), Toast.LENGTH_LONG).show()
             then()
         }, 1500)
     }
@@ -145,35 +146,35 @@ class DeveloperToolsActivity : Activity() {
         val logger = DiagnosticLogger(this, "app")
         val file = logger.latestLogFile()
         if (!file.exists() || file.length() == 0L) {
-            Toast.makeText(this, "No logs yet", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, getString(R.string.dev_no_logs), Toast.LENGTH_LONG).show()
             return
         }
         Log.i(TAG, "exportLatestLog: sharing ${file.name} (${file.length()} bytes)")
-        Toast.makeText(this, "Sharing ${file.name}", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, getString(R.string.dev_sharing, file.name), Toast.LENGTH_SHORT).show()
         startActivity(
             Intent.createChooser(
                 logger.shareFileIntent(file),
-                "Share AA Bridge logs",
+                getString(R.string.dev_share_logs),
             )
         )
     }
 
     private fun clearLogs() {
         DiagnosticLogger.clearAll(this)
-        Toast.makeText(this, "Logs cleared", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, getString(R.string.dev_logs_cleared), Toast.LENGTH_SHORT).show()
     }
 
     private fun saveLogToDownloads() {
         val logger = DiagnosticLogger(this, "app")
         val file = logger.latestLogFile()
         if (!file.exists() || file.length() == 0L) {
-            Toast.makeText(this, "No logs yet", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, getString(R.string.dev_no_logs), Toast.LENGTH_LONG).show()
             return
         }
         val name = logger.saveToDownloads(file)
         Toast.makeText(
             this,
-            if (name != null) "Saved $name to Downloads" else "Save failed",
+            if (name != null) getString(R.string.dev_saved_downloads, name) else getString(R.string.dev_save_failed),
             Toast.LENGTH_LONG,
         ).show()
     }

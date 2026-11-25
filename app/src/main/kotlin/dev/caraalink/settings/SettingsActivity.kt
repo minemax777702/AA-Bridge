@@ -1,5 +1,7 @@
 package dev.caraalink.settings
 
+import dev.caraalink.R
+
 import android.content.Intent
 import android.os.Bundle
 import android.widget.Toast
@@ -34,7 +36,7 @@ class SettingsActivity : AppCompatActivity() {
                 updateDpiSummary()
                 val reconnect = dev.caraalink.aa.AaReconnectBus.onVideoSettingsChanged
                 if (reconnect != null) {
-                    Toast.makeText(requireContext(), "Reconnecting Android Auto with the new setting…", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(requireContext(), getString(R.string.pref_reconnecting), Toast.LENGTH_SHORT).show()
                     reconnect()
                 }
             }
@@ -71,9 +73,9 @@ class SettingsActivity : AppCompatActivity() {
         private fun showCarProfilesDialog() {
             val context = requireContext()
             val profiles = CarProfiles.listProfiles(context)
-            val items = (profiles + "+ Save current settings as...").toTypedArray()
+            val items = (profiles + getString(R.string.profile_save_new)).toTypedArray()
             android.app.AlertDialog.Builder(context)
-                .setTitle("Car profiles")
+                .setTitle(getString(R.string.profile_title))
                 .setItems(items) { _, index ->
                     if (index == profiles.size) {
                         promptSaveProfile()
@@ -81,24 +83,24 @@ class SettingsActivity : AppCompatActivity() {
                         showProfileActionsDialog(profiles[index])
                     }
                 }
-                .setNegativeButton("Close", null)
+                .setNegativeButton(getString(R.string.action_close), null)
                 .show()
         }
 
         private fun promptSaveProfile() {
             val context = requireContext()
-            val input = android.widget.EditText(context).apply { hint = "e.g. My Car" }
+            val input = android.widget.EditText(context).apply { hint = getString(R.string.profile_name_hint) }
             android.app.AlertDialog.Builder(context)
-                .setTitle("Save current settings as")
+                .setTitle(getString(R.string.profile_save_title))
                 .setView(input)
-                .setPositiveButton("Save") { _, _ ->
+                .setPositiveButton(getString(R.string.action_save)) { _, _ ->
                     val name = input.text.toString().trim()
                     if (name.isNotEmpty()) {
                         CarProfiles.saveProfile(context, name)
-                        Toast.makeText(context, "Saved \"$name\"", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, getString(R.string.profile_saved, name), Toast.LENGTH_SHORT).show()
                     }
                 }
-                .setNegativeButton("Cancel", null)
+                .setNegativeButton(getString(R.string.action_cancel), null)
                 .show()
         }
 
@@ -106,16 +108,16 @@ class SettingsActivity : AppCompatActivity() {
             val context = requireContext()
             android.app.AlertDialog.Builder(context)
                 .setTitle(name)
-                .setItems(arrayOf("Load", "Delete")) { _, which ->
+                .setItems(arrayOf(getString(R.string.action_load), getString(R.string.action_delete))) { _, which ->
                     if (which == 0) {
                         CarProfiles.loadProfile(context, name)
-                        Toast.makeText(context, "Loaded \"$name\" -- reconnecting if AA is active", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, getString(R.string.profile_loaded, name), Toast.LENGTH_SHORT).show()
                     } else {
                         CarProfiles.deleteProfile(context, name)
-                        Toast.makeText(context, "Deleted \"$name\"", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, getString(R.string.profile_deleted, name), Toast.LENGTH_SHORT).show()
                     }
                 }
-                .setNegativeButton("Cancel", null)
+                .setNegativeButton(getString(R.string.action_cancel), null)
                 .show()
         }
 
@@ -132,9 +134,9 @@ class SettingsActivity : AppCompatActivity() {
             val context = requireContext()
             val config = dev.caraalink.aa.AaServiceDiscovery.configFromSettings(context)
             findPreference<androidx.preference.SwitchPreferenceCompat>("video_dpi_auto")?.summary =
-                "Scale density to the chosen resolution (currently sending density=${config.density})"
+                getString(R.string.pref_dpi_auto_summary, config.density)
             findPreference<Preference>("video_dpi_manual")?.summary =
-                "Only used when auto-detect is off (currently sending density=${config.density})"
+                getString(R.string.pref_dpi_manual_summary, config.density)
         }
     }
 }
