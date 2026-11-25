@@ -825,7 +825,7 @@ class AaSessionProbe(
                                 }.onFailure { logger.log("Microphone send failed: $it") }
                             }
                         }
-                        val remote = if (open && carbitEnabled() && AppSettings.carbitMicEnabled(context)) {
+                        val remote = if (open && !config.preview && AppSettings.carbitMicEnabled(context)) {
                             carbitAudio?.let { AaCarbitMicCapture(context, it, sendMic) }
                         } else null
                         if (remote?.prepare() == true) carbitMicCapture = remote

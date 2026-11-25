@@ -76,6 +76,7 @@ interface MirrorHost {
     /** Per-contact events from CarbitLink; legacy transports use slot zero. */
     fun onTouch(action: Int, x: Int, y: Int, slot: Int) = onTouch(action, x, y)
     fun onTouchCancel() = Unit
+    fun onHuMessage(channel: String, command: Int, body: ByteArray) = Unit
     fun onKey(key: Int)
     fun onDataStreamOpen(stream: MirrorStream)
     fun onDataStreamClosed(stream: MirrorStream)
@@ -133,6 +134,7 @@ class MirrorControlChannel(
         // Protocol sniffer (Settings > Debug > "Verbose protocol logging"):
         // normally heartbeat/screen-event are too frequent to log, but when
         // the sniffer is on, log every message with a hex preview.
+        host.onHuMessage("MIRROR", type, body)
         val sniffing = context != null && dev.caraalink.settings.AppSettings.verboseLogging(context)
         if (type != REQ_SCREEN_EVENT && type != REQ_HEARTBEAT) {
             logger.log("MIRROR ctrl 0x%04X len=%d".format(type, body.size) + if (sniffing) " " + dev.caraalink.diagnostics.ProtocolSniffer.hexPreview(body) else "")
@@ -205,7 +207,8 @@ class MirrorDataChannel(
     }
 
     override fun onData(stream: MirrorStream, data: ByteArray) {
-        framers.getOrPut(stream.localId) { ReqFramer() }.feed(data) { type, _ ->
+        framers.getOrPut(stream.localId) { ReqFramer() }.feed(data) { type, body ->
+            if (type != REQ_DATA_NEXT) host.onHuMessage("MIRROR-DATA", type, body)
             if (type == REQ_DATA_NEXT) host.onFrameRequested(stream) else stream.write(req(0x7F02, null))
         }
     }

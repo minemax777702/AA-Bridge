@@ -29,6 +29,12 @@ class CarSession(
 ) : MirrorHost {
 
     private val logger = DiagnosticLogger(context, "car-session")
+    private val huLogger = DiagnosticLogger(context, "hu-compatibility")
+    private val hu = dev.caraalink.diagnostics.HuCompatibility
+    private val huToken = Any()
+    private var gestureMode = dev.caraalink.settings.AppSettings.GestureMode.AUTO
+    private val observedSlots = mutableSetOf<Int>()
+    private var primarySlot: Int? = null
     private var transport: CarTransport? = null
     private var config: CaptureConfig? = null
     private var lastBitRate: Int = -1
@@ -69,6 +75,8 @@ class CarSession(
             it.copy(phase = ConnectionPhase.ATTACHED, accessoryManufacturer = accessory.manufacturer,
                 accessoryModel = accessory.model, lastError = null)
         }
+        gestureMode = dev.caraalink.settings.AppSettings.gestureMode(context)
+        hu.start(huToken, if (accessory.manufacturer == QdTransport.MANUFACTURER) "QDLink USB" else "CarbitLink USB")
         features.start()
         transport = if (accessory.manufacturer == QdTransport.MANUFACTURER) {
             QdTransport(conn, logger, this, ::onTransportClosed).also { it.start() }
@@ -82,6 +90,8 @@ class CarSession(
     internal fun startWireless(emulatorMode: Boolean = false, emulatorLan: EmulatorLanSession? = null) {
         check(!emulatorMode || dev.caraalink.BuildConfig.DEBUG)
         lanTestBench = emulatorMode && emulatorLan != null
+        gestureMode = dev.caraalink.settings.AppSettings.gestureMode(context)
+        hu.start(huToken, if (lanTestBench) "LAN test bench" else "CarbitLink Wi-Fi Direct")
         if (!emulatorMode) features.start()
         val socket = SocketTransport(logger, channels(), ::onTransportClosed, emulatorMode, emulatorLan)
         transport = socket
@@ -89,7 +99,10 @@ class CarSession(
     }
 
     private fun channels(): (String) -> AdbTransport.StreamHandler? {
-        val pxc = PxcChannel(logger, { info -> onClientInfo(info) }, features::replyBody).also { this.pxc = it }
+        val pxc = PxcChannel(logger, { info -> onClientInfo(info) }, features::replyBody).also {
+            this.pxc = it
+            it.observer = { command, body -> onHuMessage("PXC", command, body) }
+        }
         val ctrl = MirrorControlChannel(logger, this, context)
         val data = MirrorDataChannel(logger, this)
         return { service ->
@@ -115,6 +128,7 @@ class CarSession(
 
     private fun release() {
         released = true
+        hu.end(huToken)
         aaWatchdog.removeCallbacksAndMessages(null)
         pollThread?.interrupt()
         pollThread = null
@@ -413,6 +427,7 @@ class CarSession(
         val previous = this.config
         this.config = config
         CarScreenInfo.update(config.width, config.height)
+        hu.screen(huToken, "${config.width}x${config.height} · ${config.wantFps} fps · codec ${config.wantEncoder}")
         val fps = if (config.wantFps > 0) config.wantFps else 30
         // The car's own request, as CarbitLink sends it; the setting only covers a car that asks for none.
         val bitRate = if (config.bitRate > 0) config.bitRate else dev.caraalink.settings.AppSettings.videoBitrateKbps(context) * 1000
@@ -462,7 +477,16 @@ class CarSession(
 
     override fun onTouch(action: Int, x: Int, y: Int) = onTouch(action, x, y, 0)
 
-    override fun onTouch(action: Int, x: Int, y: Int, slot: Int) {
+    @Synchronized override fun onTouch(action: Int, x: Int, y: Int, slot: Int) {
+        if (action == android.view.MotionEvent.ACTION_DOWN && slot in 0..31) {
+            observedSlots.add(slot)
+            if (observedSlots.size > 1) hu.multiTouch(huToken)
+        } else if (action == android.view.MotionEvent.ACTION_UP) observedSlots.remove(slot)
+        if (gestureMode == dev.caraalink.settings.AppSettings.GestureMode.SINGLE) {
+            if (action == android.view.MotionEvent.ACTION_DOWN && primarySlot == null) primarySlot = slot
+            if (slot != primarySlot) return
+            if (action == android.view.MotionEvent.ACTION_UP) primarySlot = null
+        }
         val c = config ?: return
         val enc = encoder ?: return
         // Car coordinates are in its own screen size; the encoder may be a few pixels smaller.
@@ -471,8 +495,14 @@ class CarSession(
         display.touch(action, fx, fy, slot)
     }
 
-    override fun onTouchCancel() {
+    @Synchronized override fun onTouchCancel() {
+        observedSlots.clear()
+        primarySlot = null
         display.cancelTouch()
+    }
+
+    override fun onHuMessage(channel: String, command: Int, body: ByteArray) {
+        hu.receive(huToken, context, huLogger, channel, command, body)
     }
 
     override fun onKey(key: Int) {

@@ -154,10 +154,21 @@ object AppSettings {
 
     fun phoneGpsSpeed(context: Context): Boolean = prefs(context).getBoolean(PHONE_GPS_SPEED_KEY, false)
 
-    fun carbitMicEnabled(context: Context): Boolean = prefs(context).getBoolean("aa_carbit_mic", false)
+    enum class GestureMode { AUTO, MULTI, SINGLE }
+
+    internal const val HU_GESTURES_KEY = "hu_gestures"
+    internal const val HU_CAPTURE_KEY = "hu_capture"
+    internal const val HU_AUTO_KEY = "hu_auto"
+
+    fun huCapture(context: Context): Boolean = dev.caraalink.BuildConfig.DEBUG && prefs(context).getBoolean(HU_CAPTURE_KEY, false)
+    fun huAuto(context: Context): Boolean = prefs(context).getBoolean(HU_AUTO_KEY, false)
+    fun gestureMode(context: Context): GestureMode = if (huAuto(context)) GestureMode.AUTO else
+        runCatching { GestureMode.valueOf(prefs(context).getString(HU_GESTURES_KEY, "AUTO") ?: "AUTO") }.getOrDefault(GestureMode.AUTO)
+
+    fun carbitMicEnabled(context: Context): Boolean = !huAuto(context) && prefs(context).getBoolean("aa_carbit_mic", false)
 
     fun aaAudioRoute(context: Context): AaAudioRoute =
-        when (prefs(context).getString("aa_audio_route", "phone_direct")) {
+        if (huAuto(context)) AaAudioRoute.BT_PREFERRED else when (prefs(context).getString("aa_audio_route", "phone_direct")) {
             "device_only" -> AaAudioRoute.DEVICE_ONLY
             "bt_preferred" -> AaAudioRoute.BT_PREFERRED
             "carbit_experimental" -> AaAudioRoute.CARBIT_EXPERIMENTAL

@@ -359,6 +359,7 @@ class QdTransport(
 
     private fun onFrame(msgType: Int, payloadFormat: Int, payload: ByteArray) {
         json = true
+        if (payloadFormat == QdFrames.FORMAT_JSON && msgType != QdFrames.TYPE_VIDEO && msgType != QdFrames.TYPE_TOUCH) host.onHuMessage("QD-JSON", msgType, payload)
         when {
             payloadFormat == QdFrames.FORMAT_JSON -> {
                 val text = String(payload)
@@ -425,6 +426,8 @@ class QdTransport(
         val action = bb.getInt(28)
         val cmd = bb.getInt(68)
         val value = bb.getInt(72)
+        if (type == QdBin.TYPE_CMD && cmd != QdBin.CMD_HEARTBEAT || type == QdBin.TYPE_SCREEN) host.onHuMessage("QD-BIN", cmd, b)
+        if (type == QdBin.TYPE_HU && extra.isNotEmpty()) host.onHuMessage("QD-HU", cmd, extra)
         when {
             type == QdBin.TYPE_CMD && action == 1 && cmd == QdBin.CMD_HEARTBEAT -> {
                 if (binHeartbeats++ < 2) logger.log("QD RX !BIN heartbeat value=$value")

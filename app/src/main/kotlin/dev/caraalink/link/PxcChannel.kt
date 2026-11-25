@@ -21,6 +21,7 @@ class PxcChannel(
     private val replyBody: (cmd: Int) -> ByteArray? = { null },
 ) : AdbTransport.StreamHandler {
 
+    internal var observer: ((Int, ByteArray) -> Unit)? = null
     private val buffers = HashMap<Int, ByteArray>()
     private val channelOf = HashMap<Int, Int>()
     internal val carbitAudio = CarbitAudioTransport(::sendCarbitAudio, logger::log)
@@ -94,7 +95,7 @@ class PxcChannel(
             val bb = ByteBuffer.wrap(buf, 0, 16).order(ByteOrder.LITTLE_ENDIAN)
             val cmd = bb.getInt(0)
             val total = bb.getInt(4)
-            if (cmd xor total != bb.getInt(8) || total < 16) {
+            if (cmd xor total != bb.getInt(8) || total < 16 || total > 4 * 1024 * 1024) {
                 logger.log("PXC bad head on ${stream.localId}, dropping ${buf.size} bytes")
                 buf = ByteArray(0)
                 break
@@ -108,6 +109,7 @@ class PxcChannel(
     }
 
     private fun handle(stream: MirrorStream, cmd: Int, extra: Int, body: ByteArray) {
+        observer?.invoke(cmd, body)
         if (channelOf[stream.localId] == null) {
             channelOf[stream.localId] = cmd
             logger.log("PXC channel open 0x${hex(cmd)} on stream ${stream.localId}")
