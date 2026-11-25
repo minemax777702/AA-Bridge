@@ -12,9 +12,9 @@
     <string name="notif_not_responding_title">Android Auto не отвечает</string>
     <string name="notif_not_responding_text">Нажмите здесь, затем ⋮ → остановите и снова запустите сервер головного устройства.</string>
     <string name="notif_open_aa">Открыть Android Auto</string>
-    <string name="home_ready_title">Всё готово к поездке</string>
+    <string name="home_ready_title">Готово к подключению</string>
     <string name="home_ready_body">Подключитесь к автомобилю по кабелю или без проводов.</string>
-    <string name="home_connect_wireless">Подключиться без кабеля</string>
+    <string name="home_connect_wireless">Подключиться по Wi-Fi</string>
     <string name="home_searching_body">Поиск автомобиля… Не выключайте экран автомобиля.</string>
     <string name="home_use_another_car">Другой автомобиль</string>
     <string name="home_connecting_title">Подключение…</string>
@@ -29,9 +29,9 @@
     <string name="home_wifi_off_body">Для подключения к автомобилю приложению AndroidAuto Bridge нужен Wi-Fi. Подключаться к сети необязательно.</string>
     <string name="home_wifi_settings">Настройки Wi-Fi</string>
     <string name="home_disconnect">Отключиться</string>
-    <string name="home_send_logs">Отправить журналы</string>
+    <string name="home_send_logs">Отправить диагностику</string>
     <string name="home_needs_tap_title">Запустите Android Auto</string>
-    <string name="home_needs_tap_body">Сервер выключен. Запустите его одним нажатием.</string>
+    <string name="home_needs_tap_body">Откройте настройки Android Auto и запустите сервер головного устройства.</string>
     <string name="home_connected_title">Подключено</string>
     <string name="home_connected_body">Android Auto работает на экране автомобиля.</string>
     <string name="row_server">Сервер Android Auto</string>
@@ -96,4 +96,20 @@
     <string name="tile_link">Связь</string>
     <string name="link_wireless_short">Без кабеля</string>
     <string name="link_cable_short">Кабель</string>
+    <string name="ui_active">Работает</string>
+    <string name="ui_inactive">Не запущен</string>
+    <string name="ui_not_connected">Не подключено</string>
+    <string name="ui_setup_step">Шаг %1$d из 4</string>
+    <string name="ui_setup_later">Подключиться позже</string>
+    <string name="ui_connection_details">Подключение</string>
+    <string name="ui_settings_advanced_summary">Экран, звук, подключение и диагностика</string>
+    <string name="lan_debug_title">Отладка по Wi-Fi</string>
+    <string name="lan_debug_summary">Подключение Windows-эмулятора в доверенной локальной сети. После авторизации трафик не шифруется.</string>
+    <string name="lan_debug_start">Запустить сеанс отладки</string>
+    <string name="lan_debug_ip">IP: %1$s</string>
+    <string name="lan_debug_wait">Введите этот код из 10 символов на компьютере. Подключитесь в течение 2 минут.</string>
+    <string name="lan_debug_running">Сеанс отладки активен или ожидает подключения.</string>
+    <string name="lan_debug_disconnect">Сначала отключите автомобиль.</string>
+    <string name="lan_debug_no_wifi">Подключите телефон к Wi-Fi.</string>
+    <string name="lan_stationary_test_only">Только для неподвижного тестового стенда. Не используйте этот режим в движущемся автомобиле.</string>
 </resources>

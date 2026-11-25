@@ -28,7 +28,7 @@ import dev.caraalink.R
 import dev.caraalink.settings.AppSettings
 import dev.caraalink.connection.CarLink
 import dev.caraalink.connection.WirelessPhase
-import dev.caraalink.diagnostics.AdbHandshakeProbe
+import dev.caraalink.diagnostics.LegacyUsbDiagnostics
 import dev.caraalink.diagnostics.DiagnosticLogger
 import dev.caraalink.link.QdTransport
 import dev.caraalink.link.SocketTransport
@@ -39,24 +39,19 @@ import dev.caraalink.wireless.RememberedCar
 import dev.caraalink.wireless.WirelessLink
 import dev.caraalink.wireless.findCar
 import java.net.InetAddress
-import dev.caraalink.diagnostics.UsbSnifferDiagnostic
 
 /**
  * Keeps the USB link alive while the app is backgrounded (screen off is
  * expected and fine — see claude/roadmap.md; this does NOT force the screen
  * on, only holds a partial wake lock so the CPU doesn't doze mid-read).
- * Currently only drives [UsbSnifferDiagnostic]; swap in the real protocol
- * once Phase 3 lands.
  */
 class UsbLinkForegroundService : Service() {
 
     private val handler = Handler(Looper.getMainLooper())
     private var wakeLock: PowerManager.WakeLock? = null
-    private var sniffer: UsbSnifferDiagnostic? = null
-    private var adbProbe: AdbHandshakeProbe? = null
+    private val legacyDiagnostics by lazy { LegacyUsbDiagnostics(this) }
     private var session: CarSession? = null
     private var pendingAccessory: UsbAccessory? = null
-    private var resumeActiveMode: ((UsbAccessory) -> Unit)? = null
     private var detachStopRunnable: Runnable? = null
     // Confirmed from real logs (chatgpt-status.md "EIO" findings): the
     // Mirror transport dies with "read failed: EIO" after sustained use,
@@ -94,7 +89,7 @@ class UsbLinkForegroundService : Service() {
         }
         if (it.phase == ConnectionPhase.STREAMING) {
             handler.post { transportReconnectAttempts = 0 }
-            AppSettings.setCarConnectedOnce(this)
+            if (!it.emulatorActive) AppSettings.setCarConnectedOnce(this)
         }
     }
 
@@ -142,11 +137,12 @@ class UsbLinkForegroundService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.i(TAG, "onStartCommand: action=${intent?.action}")
         when (intent?.action) {
-            ACTION_START_SNIFFER -> handleStart(intent) { accessory -> beginSniffing(accessory) }
-            ACTION_START_ADB_PROBE -> handleStart(intent) { accessory -> beginAdbProbe(accessory) }
+            ACTION_START_SNIFFER -> if (dev.caraalink.BuildConfig.DEBUG) handleStart(intent) { legacyDiagnostics.startSniffer(it) } else stopSelf()
+            ACTION_START_ADB_PROBE -> if (dev.caraalink.BuildConfig.DEBUG) handleStart(intent) { legacyDiagnostics.startProbe(it) } else stopSelf()
             ACTION_START_SESSION -> {
                 handleStart(intent) { accessory -> beginSession(accessory) }
             }
+            ACTION_START_EMULATOR -> if (dev.caraalink.BuildConfig.DEBUG) beginEmulator(intent)
             ACTION_START_WIRELESS -> {
                 val address = intent.getStringExtra(EXTRA_CAR_ADDRESS)
                 val target = address?.let { RememberedCar(intent.getStringExtra(EXTRA_CAR_NAME) ?: it, it) }
@@ -169,6 +165,12 @@ class UsbLinkForegroundService : Service() {
             return
         }
         Log.i(TAG, "handleStart: ${intent.action} with accessory=${accessory.manufacturer}/${accessory.model}")
+        if (ConnectionStateHolder.snapshot.emulatorActive) {
+            val old = session
+            session = null
+            old?.stop()
+            ConnectionStateHolder.update { it.copy(emulatorActive = false, phase = ConnectionPhase.DISCONNECTED, carName = null) }
+        }
         pendingAccessory = accessory
         // The cable wins: drop any wireless search before the cable session starts.
         closeWireless(disconnect = true)
@@ -202,26 +204,6 @@ class UsbLinkForegroundService : Service() {
         }
     }
 
-    private fun beginSniffing(accessory: UsbAccessory) {
-        Log.i(TAG, "beginSniffing: ${accessory.manufacturer}/${accessory.model}")
-        adbProbe?.stop()
-        sniffer?.stop()
-        val s = UsbSnifferDiagnostic(this)
-        sniffer = s
-        resumeActiveMode = ::beginSniffing
-        s.start(accessory)
-    }
-
-    private fun beginAdbProbe(accessory: UsbAccessory) {
-        Log.i(TAG, "beginAdbProbe: ${accessory.manufacturer}/${accessory.model}")
-        sniffer?.stop()
-        adbProbe?.stop()
-        val p = AdbHandshakeProbe(this)
-        adbProbe = p
-        resumeActiveMode = ::beginAdbProbe
-        p.start(accessory)
-    }
-
     private fun beginSession(accessory: UsbAccessory) {
         // Stop a wireless session while link is still WIRELESS, so its ERROR can't stop the service.
         // It keeps Android Auto running, and the cable session attaches to it (openAndroidAuto).
@@ -231,8 +213,7 @@ class UsbLinkForegroundService : Service() {
         }
         ConnectionStateHolder.update { it.copy(link = CarLink.CABLE, wireless = WirelessPhase.IDLE, suggestion = null) }
         Log.i(TAG, "beginSession: ${accessory.manufacturer}/${accessory.model}")
-        sniffer?.stop()
-        adbProbe?.stop()
+        legacyDiagnostics.stop()
         session?.stop()
         lateinit var s: CarSession
         s = CarSession(this, accessory) { reason ->
@@ -275,12 +256,12 @@ class UsbLinkForegroundService : Service() {
         session?.stop()
         session = null
         ConnectionStateHolder.removeListener(stateListener)
+        ConnectionStateHolder.update { if (it.emulatorActive) it.copy(emulatorActive = false, phase = ConnectionPhase.DISCONNECTED, carName = null) else it }
         detachStopRunnable?.let { handler.removeCallbacks(it) }
         detachStopRunnable = null
         runCatching { unregisterReceiver(detachReceiver) }
         runCatching { unregisterReceiver(screenReceiver) }
-        sniffer?.stop()
-        adbProbe?.stop()
+        legacyDiagnostics.stop()
         releaseWakeLock()
         super.onDestroy()
     }
@@ -311,11 +292,12 @@ class UsbLinkForegroundService : Service() {
      * Android 14 refuses a microphone-typed start from the background (transport reconnects run there),
      * so fall back to connectedDevice alone rather than failing the session.
      */
-    private fun startForegroundWithMic(wireless: Boolean = false) {
+    private fun startForegroundWithMic(wireless: Boolean = false, allowPhoneGps: Boolean = true) {
         val notification = buildNotification(ConnectionStateHolder.snapshot)
         val micGranted = checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED
         // Wi-Fi Direct scans count as location access up to Android 12, so a reconnect mid-drive needs this type.
-        val location = if (wireless && needsLocationForWifiDirect() && hasFineLocation()) ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION else 0
+        val requiredLocation = if (wireless && needsLocationForWifiDirect() && hasFineLocation()) ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION else 0
+        val location = if (allowPhoneGps && AppSettings.phoneGpsSpeed(this) && hasFineLocation()) ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION else requiredLocation
         // The microphone type only exists from Android 11; on 10 it's an undeclared type and throws.
         if (micGranted && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             try {
@@ -328,7 +310,13 @@ class UsbLinkForegroundService : Service() {
             }
         }
         phoneLog.log("service started without microphone (permission=$micGranted)")
-        startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE or location)
+        try {
+            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE or location)
+        } catch (e: SecurityException) {
+            if (location == requiredLocation) throw e
+            phoneLog.log("GPS foreground access unavailable; continuing without optional location type")
+            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE or requiredLocation)
+        }
     }
 
     private fun needsLocationForWifiDirect() = Build.VERSION.SDK_INT <= Build.VERSION_CODES.S_V2
@@ -336,9 +324,54 @@ class UsbLinkForegroundService : Service() {
     private fun hasFineLocation() =
         checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED
 
+    private fun beginEmulator(intent: Intent) {
+        // Called only from an explicit in-app debug action; service is not exported.
+        if (!dev.caraalink.BuildConfig.DEBUG || session != null || wirelessLink != null ||
+            pendingAccessory != null || ConnectionStateHolder.snapshot.link != CarLink.NONE) return
+        try {
+            startForegroundWithMic(allowPhoneGps = false)
+        } catch (e: SecurityException) {
+            phoneLog.log("LAN debug foreground start refused: $e")
+            stopSelf()
+            return
+        }
+        val endpoint = dev.caraalink.link.EmulatorWifi.current(this)
+        val key = intent.getStringExtra(EXTRA_EMULATOR_CODE)?.let(dev.caraalink.link.EmulatorLanAuth::parseCode)
+        if (endpoint == null || endpoint.address.hostAddress != intent.getStringExtra(EXTRA_EMULATOR_IP) || key == null) {
+            ConnectionStateHolder.update { it.copy(lastError = "LAN debug endpoint changed") }
+            stopSelfCleanly()
+            return
+        }
+        val lan = dev.caraalink.link.EmulatorLanSession(endpoint, key)
+        stopping = false
+        acquireWakeLock()
+        lateinit var s: CarSession
+        s = CarSession(this, null) { _ ->
+            handler.post {
+                if (session === s) {
+                    session = null
+                    stopSelfCleanly()
+                }
+            }
+        }
+        session = s
+        ConnectionStateHolder.update {
+            it.copy(link = CarLink.NONE, wireless = WirelessPhase.IDLE, emulatorActive = true,
+                phase = ConnectionPhase.DISCONNECTED, carName = null, lastError = null)
+        }
+        s.startWireless(emulatorMode = true, emulatorLan = lan)
+        handler.postDelayed({
+            if (session === s && ConnectionStateHolder.snapshot.phase != ConnectionPhase.STREAMING) {
+                phoneLog.log("LAN debug connection timeout")
+                stopSelfCleanly()
+            }
+        }, 120_000L)
+    }
+
     // --- wireless ---
 
     private fun beginWireless(target: RememberedCar?) {
+        if (ConnectionStateHolder.snapshot.emulatorActive) return
         // startForegroundService needs startForeground even when there turns out to be nothing to do.
         startForegroundWithMic(wireless = true)
         if (target == null || ConnectionStateHolder.snapshot.link == CarLink.CABLE) {
@@ -573,11 +606,11 @@ class UsbLinkForegroundService : Service() {
         // Searching phases end with the service; NOT_FOUND, FAILED and WIFI_OFF stay for Home.
         ConnectionStateHolder.update {
             val active = it.wireless == WirelessPhase.SEARCHING || it.wireless == WirelessPhase.CONNECTING || it.wireless == WirelessPhase.RECONNECTING
-            it.copy(link = CarLink.NONE, wireless = if (active) WirelessPhase.IDLE else it.wireless)
+            it.copy(link = CarLink.NONE, wireless = if (active) WirelessPhase.IDLE else it.wireless,
+                emulatorActive = false, phase = if (it.emulatorActive) ConnectionPhase.DISCONNECTED else it.phase,
+                carName = if (it.emulatorActive) null else it.carName)
         }
-        sniffer?.stop()
-        adbProbe?.stop()
-        adbProbe = null
+        legacyDiagnostics.stop()
         releaseWakeLock()
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
@@ -669,12 +702,15 @@ class UsbLinkForegroundService : Service() {
         const val ACTION_START_SESSION = "dev.caraalink.service.action.START_SESSION"
         /** A session that just failed stops the service; a leftover ERROR seen by a later update must not. */
         internal fun shouldStopOnError(previous: ConnectionPhase?, snapshot: ConnectionSnapshot): Boolean =
-            snapshot.phase == ConnectionPhase.ERROR && previous != ConnectionPhase.ERROR && snapshot.link != CarLink.WIRELESS
+            snapshot.phase == ConnectionPhase.ERROR && previous != ConnectionPhase.ERROR && snapshot.link != CarLink.WIRELESS && !snapshot.emulatorActive
 
         /** Null keeps trying: inside the mid-drive window a failed attempt goes back to scanning. */
         internal fun afterFailedAttempt(reconnectUntil: Long, now: Long): WirelessPhase? =
             if (now < reconnectUntil) null else WirelessPhase.FAILED
 
+        const val ACTION_START_EMULATOR = "dev.caraalink.service.action.START_EMULATOR"
+        const val EXTRA_EMULATOR_IP = "emulator_ip"
+        const val EXTRA_EMULATOR_CODE = "emulator_code"
         const val ACTION_START_WIRELESS = "dev.caraalink.service.action.START_WIRELESS"
         const val EXTRA_CAR_ADDRESS = "car_address"
         const val EXTRA_CAR_NAME = "car_name"

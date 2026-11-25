@@ -29,6 +29,22 @@ class CarSession(
 ) : MirrorHost {
 
     private val logger = DiagnosticLogger(context, "car-session")
+    private val huLogger = DiagnosticLogger(context, "hu-compatibility")
+    private val hu = dev.caraalink.diagnostics.HuCompatibility
+    private val huToken = Any()
+    private var calibrationContact: Int? = null
+    @Volatile private var calibrationMapping: dev.caraalink.diagnostics.HuCalibration.Mapping? = null
+    private val tools = dev.caraalink.diagnostics.HuDiagnosticTools
+    private fun registerDiagnosticTools() {
+        tools.attach(dev.caraalink.diagnostics.HuDiagnosticTools.Binding(huToken, hu.state.value.sessionId,
+            ready = { !released && !openingAa && display.mode == CarDisplay.Mode.STATUS && display.screen == CarScreen.CLOSED &&
+                dev.caraalink.aa.AaSessionProbe.active == null && encoder != null },
+            show = { display.showCalibration() }, close = { display.showStatus(CarScreen.CLOSED) },
+            redraw = { display.redraw() }, audio = { pxc?.carbitAudio }, apply = { calibrationMapping = it }))
+    }
+    private var gestureMode = dev.caraalink.settings.AppSettings.GestureMode.AUTO
+    private val observedSlots = mutableSetOf<Int>()
+    private val singleTouch = HuGestureFilter()
     private var transport: CarTransport? = null
     private var config: CaptureConfig? = null
     private var lastBitRate: Int = -1
@@ -45,6 +61,7 @@ class CarSession(
     }
 
     @Volatile private var released = false
+    @Volatile private var lanTestBench = false
 
     private val frameLock = Any()
     @Volatile private var dataStream: MirrorStream? = null
@@ -68,6 +85,9 @@ class CarSession(
             it.copy(phase = ConnectionPhase.ATTACHED, accessoryManufacturer = accessory.manufacturer,
                 accessoryModel = accessory.model, lastError = null)
         }
+        gestureMode = dev.caraalink.settings.AppSettings.gestureMode(context)
+        hu.start(huToken, if (accessory.manufacturer == QdTransport.MANUFACTURER) "QDLink USB" else "CarbitLink USB", dev.caraalink.settings.AppSettings.huProfileSignature(context))
+        registerDiagnosticTools()
         features.start()
         transport = if (accessory.manufacturer == QdTransport.MANUFACTURER) {
             QdTransport(conn, logger, this, ::onTransportClosed).also { it.start() }
@@ -78,13 +98,24 @@ class CarSession(
     }
 
     /** The same channels over the car's Wi-Fi Direct TCP connections; the car shows up on its first CLIENT_INFO. */
-    fun startWireless() {
-        features.start()
-        transport = SocketTransport(logger, channels(), ::onTransportClosed).also { it.start() }
+    internal fun startWireless(emulatorMode: Boolean = false, emulatorLan: EmulatorLanSession? = null) {
+        check(!emulatorMode || dev.caraalink.BuildConfig.DEBUG)
+        lanTestBench = emulatorMode && emulatorLan != null
+        gestureMode = dev.caraalink.settings.AppSettings.gestureMode(context)
+        hu.start(huToken, if (lanTestBench) "LAN test bench" else "CarbitLink Wi-Fi Direct", dev.caraalink.settings.AppSettings.huProfileSignature(context))
+        registerDiagnosticTools()
+        if (!emulatorMode) features.start()
+        val socket = SocketTransport(logger, channels(), ::onTransportClosed, emulatorMode, emulatorLan)
+        transport = socket
+        socket.start()
     }
 
     private fun channels(): (String) -> AdbTransport.StreamHandler? {
-        val pxc = PxcChannel(logger, { info -> onClientInfo(info) }, features::replyBody).also { this.pxc = it }
+        val pxc = PxcChannel(logger, { info -> onClientInfo(info) }, features::replyBody).also {
+            this.pxc = it
+            it.observer = { command, body -> onHuMessage("PXC", command, body) }
+            it.txObserver = { command, body -> onHuTx("PXC", command, body) }
+        }
         val ctrl = MirrorControlChannel(logger, this, context)
         val data = MirrorDataChannel(logger, this)
         return { service ->
@@ -110,6 +141,8 @@ class CarSession(
 
     private fun release() {
         released = true
+        tools.detach(huToken)
+        hu.end(huToken)
         aaWatchdog.removeCallbacksAndMessages(null)
         pollThread?.interrupt()
         pollThread = null
@@ -159,9 +192,14 @@ class CarSession(
 
     private fun openAndroidAuto() {
         if (released) return
-        if (dev.caraalink.aa.AaSessionProbe.active != null) {
-            showAaSurface()
-            return
+        val active = dev.caraalink.aa.AaSessionProbe.active
+        if (active != null) {
+            // Never hand a stationary simulated AA session to a physical car.
+            if (active.isLanTestBench != lanTestBench) active.stop()
+            else {
+                showAaSurface()
+                return
+            }
         }
         synchronized(this) {
             if (openingAa) {
@@ -192,7 +230,8 @@ class CarSession(
                 return@Thread
             }
             logger.log("openAndroidAuto: starting AA session probe")
-            val probe = dev.caraalink.aa.AaSessionProbe(context)
+            val probe = dev.caraalink.aa.AaSessionProbe(context,
+                dev.caraalink.aa.AaSessionProbe.Config(lanTestBench = lanTestBench))
             probe.attachCarbitAudio(pxc?.carbitAudio)
             probe.onEstablished = { AndroidAutoServer.cancelNeedsTap(context) }
             probe.onGaveUp = { main.post { onAaNotResponding() } }
@@ -362,6 +401,11 @@ class CarSession(
         // A restart dismisses the old presentation while staying in AA; only a real exit
         // (showStatus sets mode away from AA first) should stop the probe in onSurface(null).
         val myProbe = dev.caraalink.aa.AaSessionProbe.active
+        if (myProbe != null && myProbe.isLanTestBench != lanTestBench) {
+            myProbe.stop()
+            openAndroidAuto()
+            return
+        }
         myProbe?.attachCarbitAudio(pxc?.carbitAudio)
         display.showAa(
             videoWidth = config.resolution.width,
@@ -396,7 +440,9 @@ class CarSession(
     override fun onCaptureConfig(config: CaptureConfig) {
         val previous = this.config
         this.config = config
+        if (previous != null && (previous.width != config.width || previous.height != config.height)) tools.reset(hu.state.value.sessionId)
         CarScreenInfo.update(config.width, config.height)
+        hu.screen(huToken, "${config.width}x${config.height} · ${config.wantFps} fps · codec ${config.wantEncoder}")
         val fps = if (config.wantFps > 0) config.wantFps else 30
         // The car's own request, as CarbitLink sends it; the setting only covers a car that asks for none.
         val bitRate = if (config.bitRate > 0) config.bitRate else dev.caraalink.settings.AppSettings.videoBitrateKbps(context) * 1000
@@ -446,22 +492,58 @@ class CarSession(
 
     override fun onTouch(action: Int, x: Int, y: Int) = onTouch(action, x, y, 0)
 
-    override fun onTouch(action: Int, x: Int, y: Int, slot: Int) {
+    @Synchronized override fun onTouch(action: Int, x: Int, y: Int, slot: Int) {
+        if (slot !in 0..31) return
         val c = config ?: return
         val enc = encoder ?: return
-        // Car coordinates are in its own screen size; the encoder may be a few pixels smaller.
-        val fx = x * enc.width.toFloat() / c.width
-        val fy = y * enc.height.toFloat() / c.height
+        if (c.width <= 0 || c.height <= 0) return
+        val raw = dev.caraalink.diagnostics.HuCalibration.Point(x.toDouble()/c.width, y.toDouble()/c.height)
+        if (display.mode == CarDisplay.Mode.CALIBRATION || tools.state.value.calibrating) {
+            observedSlots.clear()
+            singleTouch.reset()
+            if (display.mode != CarDisplay.Mode.CALIBRATION) return
+            if (action == android.view.MotionEvent.ACTION_DOWN && calibrationContact == null) {
+                calibrationContact = slot
+                tools.tap(huToken, raw)
+            } else if (action == android.view.MotionEvent.ACTION_UP && calibrationContact == slot) calibrationContact = null
+            return
+        }
+        calibrationContact = null
+        if (action == android.view.MotionEvent.ACTION_DOWN) {
+            observedSlots.add(slot)
+            if (observedSlots.size > 1) hu.multiTouch(huToken)
+        } else if (action == android.view.MotionEvent.ACTION_UP) observedSlots.remove(slot)
+        if (gestureMode == dev.caraalink.settings.AppSettings.GestureMode.SINGLE && !singleTouch.accepts(action, slot)) return
+        // Calibration is explicit and scoped to this physical connection.
+        val mapped = calibrationMapping?.map(raw) ?: raw
+        val fx = (mapped.x * enc.width).toFloat()
+        val fy = (mapped.y * enc.height).toFloat()
         display.touch(action, fx, fy, slot)
     }
 
-    override fun onTouchCancel() {
+    @Synchronized override fun onTouchCancel() {
+        calibrationContact = null
+        observedSlots.clear()
+        singleTouch.reset()
         display.cancelTouch()
+    }
+
+    override fun onHuTx(channel: String, command: Int, body: ByteArray) {
+        if (dev.caraalink.settings.AppSettings.huCapture(context) && command !in listOf(0x10060,0x10061,0x70000000,0x70000001,0x41))
+            huLogger.log("HU TX $channel:0x${command.toUInt().toString(16)} len=${body.size}")
+    }
+
+    override fun onHuMessage(channel: String, command: Int, body: ByteArray) {
+        runCatching { hu.receive(huToken, context, huLogger, channel, command, body) }
+            .onFailure { huLogger.log("HU diagnostic parse failed: ${it.javaClass.simpleName}") }
     }
 
     override fun onKey(key: Int) {
         logger.log("car key $key")
-        if (key == MirrorControlChannel.KEY_HOME || key == MirrorControlChannel.KEY_BACK) closeAa()
+        if (key == MirrorControlChannel.KEY_HOME || key == MirrorControlChannel.KEY_BACK) {
+            tools.stop(hu.state.value.sessionId)
+            closeAa()
+        }
     }
 
     override fun onDataStreamOpen(stream: MirrorStream) {

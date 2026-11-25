@@ -15,17 +15,22 @@ object CarProfiles {
     private const val PREFS_FILE = "car_profiles"
 
     /** Keys worth remembering per car; everything else in Settings is phone-wide, not car-specific. */
-    private val PROFILE_KEYS = listOf(
-        "car_orientation",
-        "video_resolution_mode",
-        "video_resolution_custom_width",
-        "video_resolution_custom_height",
-        "video_frame_rate",
-        "video_bitrate_kbps",
-        "video_dpi_auto",
-        "video_dpi_manual",
-        "aa_fill_mode",
-        "aa_audio_route",
+    private val PROFILE_DEFAULTS = mapOf(
+        "car_orientation" to "auto",
+        "video_resolution_mode" to "auto",
+        "video_resolution_custom_width" to JSONObject.NULL,
+        "video_resolution_custom_height" to JSONObject.NULL,
+        "video_frame_rate" to "30",
+        "video_bitrate_kbps" to "6000",
+        "video_dpi_auto" to true,
+        "video_dpi_manual" to "160",
+        "video_downscale_720p" to true,
+        "aa_fill_mode" to "fit",
+        "aa_auto_crop" to true,
+        "aa_audio_route" to "phone_direct",
+        "aa_carbit_mic" to false,
+        AppSettings.HU_AUTO_KEY to false,
+        AppSettings.HU_GESTURES_KEY to "AUTO",
     )
 
     private fun store(context: Context) = context.getSharedPreferences(PREFS_FILE, Context.MODE_PRIVATE)
@@ -36,15 +41,10 @@ object CarProfiles {
 
     fun saveProfile(context: Context, name: String) {
         if (name.isBlank()) return
-        val defaults = PreferenceManagerCompat.default(context)
+        val values = AppSettings.prefs(context).all
         val snapshot = JSONObject()
-        for (key in PROFILE_KEYS) {
-            when (val value = defaults.all[key]) {
-                is Boolean -> snapshot.put(key, value)
-                is String -> snapshot.put(key, value)
-                null -> {}
-                else -> snapshot.put(key, value.toString())
-            }
+        for ((key, default) in PROFILE_DEFAULTS) {
+            snapshot.put(key, values[key] ?: default)
         }
         store(context).edit().putString(name.trim(), snapshot.toString()).apply()
         logger(context).log("saved profile '${name.trim()}': $snapshot")
@@ -54,13 +54,20 @@ object CarProfiles {
     fun loadProfile(context: Context, name: String): Boolean {
         val json = store(context).getString(name, null) ?: return false
         val snapshot = JSONObject(json)
-        val defaults = PreferenceManagerCompat.default(context)
+        val defaults = AppSettings.prefs(context)
         val editor = defaults.edit()
-        for (key in PROFILE_KEYS) {
+        if (!snapshot.has(AppSettings.HU_AUTO_KEY) && snapshot.has("aa_audio_route")) editor.putBoolean(AppSettings.HU_AUTO_KEY, false)
+        for ((key, default) in PROFILE_DEFAULTS) {
+            // Old profiles did not include every key; retain their existing behavior.
             if (!snapshot.has(key)) continue
-            when (val value = snapshot.get(key)) {
-                is Boolean -> editor.putBoolean(key, value)
-                else -> editor.putString(key, value.toString())
+            if (snapshot.isNull(key)) {
+                editor.remove(key)
+                continue
+            }
+            val value = snapshot.get(key)
+            when {
+                default is Boolean && value is Boolean -> editor.putBoolean(key, value)
+                default !is Boolean && value is String -> editor.putString(key, value)
             }
         }
         editor.apply()
@@ -74,7 +81,3 @@ object CarProfiles {
     }
 }
 
-/** Thin wrapper so CarProfiles doesn't need an androidx.preference import for one call. */
-private object PreferenceManagerCompat {
-    fun default(context: Context) = androidx.preference.PreferenceManager.getDefaultSharedPreferences(context)
-}

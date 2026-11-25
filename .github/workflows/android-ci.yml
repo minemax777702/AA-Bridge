@@ -11,19 +11,33 @@ on:
   push:
     branches: [main, 'security/**']
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
   workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Fast Debug or Full Build'
+        type: choice
+        required: true
+        default: fast
+        options:
+          - fast
+          - full
 
 permissions:
   contents: read
 
 concurrency:
-  group: android-ci-${{ github.workflow }}-${{ github.ref }}
+  # Manual debug runs must not cancel mandatory PR/push audits.
+  group: android-ci-${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}-${{ inputs.mode || 'auto' }}
   cancel-in-progress: true
 
 jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    env:
+      # Full checks for main/security pushes, ready PRs, and manual full runs.
+      FULL_BUILD: ${{ github.event_name == 'push' || github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/security/') || (github.event_name == 'pull_request' && !github.event.pull_request.draft) || (github.event_name == 'workflow_dispatch' && inputs.mode == 'full') }}
     steps:
       - uses: actions/checkout@v7
 
@@ -32,15 +46,42 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
-          cache: gradle
 
-      - name: Accept Android SDK licenses
-        run: |
-          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
+      - name: Setup Gradle build cache
+        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+        with:
+          cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+          add-job-summary-as-pr-comment: never
 
-      - name: Install required SDK platform/build-tools
+      - name: Select build mode and resources
+        shell: bash
         run: |
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-34" "build-tools;36.0.0"
+          set -euo pipefail
+          if [ "$FULL_BUILD" = true ]; then
+            echo "Build mode: Full Build (Debug + Release + OSV + ClamAV)" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Build mode: Fast Debug (not a full security audit; testing only)" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          mem_kib="$(awk '/MemTotal:/ {print $2}' /proc/meminfo)"
+          if [ "$mem_kib" -ge 12582912 ]; then
+            echo "CI_GRADLE_HEAP=4g" >> "$GITHUB_ENV"
+            echo "CI_GRADLE_WORKERS=4" >> "$GITHUB_ENV"
+          else
+            echo "CI_GRADLE_HEAP=2g" >> "$GITHUB_ENV"
+            echo "CI_GRADLE_WORKERS=2" >> "$GITHUB_ENV"
+          fi
+
+      - name: Ensure required Android SDK components
+        shell: bash
+        run: |
+          set -euo pipefail
+          packages=()
+          [ -f "$ANDROID_HOME/platforms/android-34/android.jar" ] || packages+=("platforms;android-34")
+          [ -x "$ANDROID_HOME/build-tools/36.0.0/apksigner" ] && [ -x "$ANDROID_HOME/build-tools/36.0.0/aapt" ] || packages+=("build-tools;36.0.0")
+          if [ "${#packages[@]}" -gt 0 ]; then
+            yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
+            "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "${packages[@]}"
+          fi
 
       - name: Verify Gradle Wrapper
         run: echo "498495120a03b9a6ab5d155f5de3c8f0d986a449153702fb80fc80e134484f17  gradle/wrapper/gradle-wrapper.jar" | sha256sum -c -
@@ -48,13 +89,34 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Build debug APK and run unit tests
+      # A persistent private debug signing key makes APK updates compatible.
+      # Never expose the key in artifacts or use a production signing key here.
+      - name: Configure persistent debug signing
+        env:
+          DEBUG_KEYSTORE_BASE64: ${{ secrets.AA_BRIDGE_DEBUG_KEYSTORE_BASE64 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "$DEBUG_KEYSTORE_BASE64" ]; then
+            echo "::warning::No persistent debug signing key configured. This APK may require a fresh install."
+            echo "Debug APK: temporary signing key (updates are not guaranteed)." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          umask 077
+          mkdir -p "$HOME/.android"
+          printf '%s' "$DEBUG_KEYSTORE_BASE64" | base64 --decode > "$HOME/.android/debug.keystore"
+          keytool -list -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey >/dev/null
+          echo "Debug APK: persistent signing key configured." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Build APKs for selected mode and run debug unit tests
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p audit
+          tasks=(:app:assembleDebug :app:testDebugUnitTest)
+          if [ "$FULL_BUILD" = true ]; then tasks+=(:app:assembleRelease); fi
           for attempt in 1 2 3; do
-            if ./gradlew assembleDebug testDebugUnitTest --no-daemon 2>&1 | tee "audit/build-attempt-${attempt}.log"; then
+            if ./gradlew "${tasks[@]}" --build-cache --parallel --daemon --max-workers="$CI_GRADLE_WORKERS" "-Dorg.gradle.jvmargs=-Xmx$CI_GRADLE_HEAP" 2>&1 | tee "audit/build-attempt-${attempt}.log"; then
               exit 0
             fi
             if ! grep -Eiq 'status code 429|HTTP[ /]+429|Too Many Requests' "audit/build-attempt-${attempt}.log"; then
@@ -70,24 +132,29 @@ jobs:
           exit 1
 
       - name: Export resolved dependency inventory
+        if: env.FULL_BUILD == 'true'
         run: |
           mkdir -p audit
-          ./gradlew -I ci/dependency-audit.init.gradle securityDependencyInventory --no-daemon
+          ./gradlew -I ci/dependency-audit.init.gradle securityDependencyInventory --daemon --no-configuration-cache --max-workers="$CI_GRADLE_WORKERS" "-Dorg.gradle.jvmargs=-Xmx$CI_GRADLE_HEAP"
 
       - name: Audit dependencies against OSV
+        if: env.FULL_BUILD == 'true'
         run: python3 ci/osv-audit.py
 
       - name: Antivirus scan of APK and extracted contents
-        if: ${{ !cancelled() && hashFiles('app/build/outputs/apk/debug/app-debug.apk') != '' }}
+        if: ${{ !cancelled() && env.FULL_BUILD == 'true' && hashFiles('app/build/outputs/apk/debug/app-debug.apk') != '' }}
         run: |
           set -euo pipefail
           mkdir -p audit
           test -f app/build/outputs/apk/debug/app-debug.apk
-          sudo apt-get update
-          sudo apt-get install -y clamav
+          if ! command -v clamscan >/dev/null || ! command -v freshclam >/dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y clamav
+          fi
           sudo systemctl stop clamav-freshclam || true
           sudo freshclam --stdout
           scan_dir="$(mktemp -d)"
+          trap 'rm -rf "$scan_dir"' EXIT
           unzip -q app/build/outputs/apk/debug/app-debug.apk -d "$scan_dir"
           clamscan --version | tee audit/clamav.txt
           clamscan --recursive --infected --max-filesize=100M --max-scansize=400M app/build/outputs/apk/debug/app-debug.apk "$scan_dir" | tee -a audit/clamav.txt
@@ -102,6 +169,10 @@ jobs:
           "$tools/apksigner" verify --verbose --print-certs "$apk" | tee audit/apk-signature.txt
           "$tools/aapt" dump permissions "$apk" | tee audit/apk-permissions.txt
           if grep -q 'android.permission.REQUEST_INSTALL_PACKAGES' audit/apk-permissions.txt; then exit 1; fi
+
+      - name: Remove CI signing key
+        if: always()
+        run: rm -f "$HOME/.android/debug.keystore"
 
       - name: Upload security reports
         if: always()
@@ -122,8 +193,9 @@ jobs:
       - name: Upload debug APK
         uses: actions/upload-artifact@v7
         with:
-          name: AndroidAuto-Bridge-debug-${{ github.run_number }}
+          name: AndroidAuto-Bridge-${{ env.FULL_BUILD == 'true' && 'debug' || 'fast-debug' }}-${{ github.run_number }}
           path: dist/
+          compression-level: 0
           if-no-files-found: error
           retention-days: 30
 

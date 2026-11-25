@@ -16,6 +16,7 @@ internal class AaOutputRoute(
 ) {
     private var lastCheck = -1L
     private var selectedId: Int? = null
+    private val huSession = dev.caraalink.diagnostics.HuCompatibility.state.value.sessionId
 
     fun refresh(track: AudioTrack, force: Boolean = false) {
         val now = SystemClock.elapsedRealtime()
@@ -34,6 +35,7 @@ internal class AaOutputRoute(
                 selectedId = if (accepted) device?.id else null
                 logger.log("AA audio preferred type=${device?.type} accepted=$accepted actual=${track.routedDevice?.type}")
             }
+            if (!preview) dev.caraalink.diagnostics.HuCompatibility.output(huSession, track.routedDevice?.type)
         }.onFailure { logger.log("AA audio routing failed: $it") }
     }
 }

@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
@@ -110,14 +111,23 @@ fun SetupScreen(onDone: () -> Unit, onOpenNearby: () -> Unit) {
         requested = true
     }
 
-    Surface(Modifier.fillMaxSize().dashGlow(Dash.GlowIdle), color = Color.Transparent, contentColor = Dash.Text) {
+    Surface(Modifier.fillMaxSize().background(Dash.Background), color = Color.Transparent, contentColor = Dash.Text) {
         Column(Modifier.fillMaxSize().systemBarsPadding().verticalScroll(rememberScrollState())) {
             BrandBar()
             Column(Modifier.padding(horizontal = 24.dp)) {
                 Text(stringResource(R.string.setup_title), style = MaterialTheme.typography.headlineMedium)
                 Spacer(Modifier.height(4.dp))
                 Text(stringResource(R.string.setup_subtitle), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(Modifier.height(20.dp))
+                Spacer(Modifier.height(12.dp))
+                Text(stringResource(R.string.ui_setup_step, step.coerceIn(1, 4)), color = Dash.Teal, style = MaterialTheme.typography.labelLarge)
+                Spacer(Modifier.height(10.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    repeat(4) { index ->
+                        Box(Modifier.weight(1f).height(4.dp).background(
+                            if (index < step) Dash.Teal else Dash.Track, RoundedCornerShape(4.dp)))
+                    }
+                }
+                Spacer(Modifier.height(22.dp))
 
                 StepCard(1, step, R.string.setup_perm_title, R.string.setup_perm_body) {
                     GlowButton(stringResource(R.string.setup_perm_button), {
@@ -148,7 +158,13 @@ fun SetupScreen(onDone: () -> Unit, onOpenNearby: () -> Unit) {
                     }
                 }
                 StepCard(4, step, R.string.setup_car_title, R.string.setup_car_body) {
-                    TextButton(onClick = onOpenNearby) { Text(stringResource(R.string.home_connect_wireless)) }
+                    GlowButton(stringResource(R.string.home_connect_wireless), onOpenNearby)
+                }
+                if (step == 4) {
+                    TextButton(onClick = {
+                        AppSettings.setSetupComplete(context, true)
+                        onDone()
+                    }) { Text(stringResource(R.string.ui_setup_later)) }
                 }
                 Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { SendLogsLink() }
                 Spacer(Modifier.height(24.dp))
@@ -166,7 +182,8 @@ private fun StepCard(number: Int, current: Int, title: Int, body: Int, action: (
     Card(
         modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
         colors = CardDefaults.cardColors(containerColor = if (active) colors.surfaceContainerHigh else colors.surfaceContainerLow),
-        border = if (active) BorderStroke(1.5.dp, colors.primary) else null,
+        shape = RoundedCornerShape(20.dp),
+        border = if (active) BorderStroke(1.dp, colors.primary.copy(alpha = 0.65f)) else null,
     ) {
         Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             Box(
@@ -197,8 +214,10 @@ private fun StepCard(number: Int, current: Int, title: Int, body: Int, action: (
                     fontWeight = FontWeight.SemiBold,
                     color = if (done || active) colors.onSurface else colors.onSurfaceVariant,
                 )
-                Spacer(Modifier.height(4.dp))
-                Text(stringResource(body), style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
+                if (active) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(stringResource(body), style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
+                }
                 if (active && action != null) {
                     Spacer(Modifier.height(12.dp))
                     action()

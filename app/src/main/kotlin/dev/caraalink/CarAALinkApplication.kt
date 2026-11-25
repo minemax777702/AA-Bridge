@@ -24,7 +24,7 @@ class CarAALinkApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         installCrashLogger()
-        startSelfLogcatCapture()
+        if (BuildConfig.DEBUG) startSelfLogcatCapture()
         dev.caraalink.settings.AppSettings.applyFastVideoDefaults(this)
         // Carry a previous crash's full trace into THIS launch's own log
         // file (a new file per launch -- see DiagnosticLogger.currentFile())

@@ -63,6 +63,8 @@ class AaSessionProbe(
         val retryDelayMs: Long = 2_000,
         /** True only for the on-phone Car Preview session -- see AaServiceDiscovery.configFromSettings(). */
         val preview: Boolean = false,
+        /** Explicit stationary test bench only; never set for USB or ordinary Wi-Fi Direct. */
+        val lanTestBench: Boolean = false,
     )
 
     companion object {
@@ -74,6 +76,14 @@ class AaSessionProbe(
         var active: AaSessionProbe? = null
             private set
     }
+
+    internal val isLanTestBench: Boolean = dev.caraalink.BuildConfig.DEBUG && config.lanTestBench
+
+    private fun stationaryBenchActive(): Boolean = StationaryBenchPolicy.canReportStationary(
+        isLanTestBench = isLanTestBench,
+        enabled = dev.caraalink.settings.AppSettings.parkingMode(context),
+        snapshot = dev.caraalink.connection.ConnectionStateHolder.snapshot,
+    )
 
     private val logger = DiagnosticLogger(context, "aa-session")
     private val running = AtomicBoolean(false)
@@ -802,6 +812,10 @@ class AaSessionProbe(
                         logger.log("RX MICROPHONE_REQUEST open=$open")
                         stopMicrophone()
                         voiceRequested = open
+                        if (open && !config.preview) {
+                            val hu = dev.caraalink.diagnostics.HuCompatibility
+                            hu.microphone(hu.state.value.sessionId, "UNKNOWN")
+                        }
                         val micChannel = message.channelId
                         val sendMic: (ByteArray) -> Unit = { pcm ->
                             // No capture or forwarding after close/shutdown or on a stale channel.
@@ -815,7 +829,7 @@ class AaSessionProbe(
                                 }.onFailure { logger.log("Microphone send failed: $it") }
                             }
                         }
-                        val remote = if (open && carbitEnabled() && AppSettings.carbitMicEnabled(context)) {
+                        val remote = if (open && !config.preview && AppSettings.carbitMicEnabled(context)) {
                             carbitAudio?.let { AaCarbitMicCapture(context, it, sendMic) }
                         } else null
                         if (remote?.prepare() == true) carbitMicCapture = remote
@@ -844,6 +858,11 @@ class AaSessionProbe(
                         if (sensorType == SENSOR_NIGHT_MODE) {
                             nightSensorStarted = true
                             sendNightIfChanged()
+                        } else if (sensorType == AaServiceDiscovery.SENSOR_DRIVING_STATUS_DATA.toLong() && stationaryBenchActive()) {
+                            logger.log("TX SENSOR_EVENT stationary LAN test bench")
+                            channel.sendChannelSpecific(message.channelId, AaFraming.MSG_SENSOR_EVENT,
+                                AaProtobuf.Writer().message(AaServiceDiscovery.SENSOR_DRIVING_STATUS_DATA,
+                                    AaProtobuf.Writer().int(1, 0).build()).build())
                         }
                     }
                     continue

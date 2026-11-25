@@ -1,137 +1,81 @@
 package dev.caraalink.diagnostics
 
-import dev.caraalink.R
-
-import android.app.Activity
 import android.content.Intent
-import android.content.res.ColorStateList
-import android.graphics.Color
 import android.os.Bundle
-import android.util.Log
-import android.util.TypedValue
-import android.view.ViewGroup
-import android.widget.LinearLayout
-import android.widget.ScrollView
-import android.widget.TextView
 import android.widget.Toast
-import com.google.android.material.button.MaterialButton
+import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import dev.caraalink.R
+import dev.caraalink.aa.AaPreviewActivity
+import dev.caraalink.ui.SubScreen
+import dev.caraalink.ui.theme.AaBridgeTheme
+import dev.caraalink.ui.theme.Dash
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
-/**
- * What's actually still useful day to day: export logs, and the interactive
- * on-phone AA preview. The early RE-phase probes (USB sniffer, ADB
- * handshake probe, raw AA TLS receiver, AA version-only probe) are
- * superseded by the real session path (AaSessionProbe) and were removed
- * from here -- their code is untouched (AaTlsReceiver.kt, AaVersionProbe.kt,
- * UsbLinkForegroundService's sniffer/ADB-probe actions) in case protocol
- * work ever needs to isolate a single rung again.
- */
-class DeveloperToolsActivity : Activity() {
-
-    companion object {
-        private const val TAG = "DeveloperToolsActivity"
-    }
-
+class DeveloperToolsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge(SystemBarStyle.dark(android.graphics.Color.TRANSPARENT), SystemBarStyle.dark(android.graphics.Color.TRANSPARENT))
+        setContent { AaBridgeTheme { DeveloperTools(onBack = { finish() }) } }
+    }
+}
 
-        val pad = dp(24)
-        val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(pad, pad, pad, pad)
-            setBackgroundColor(Color.parseColor("#0E1116"))
+@Composable
+private fun DeveloperTools(onBack: () -> Unit) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var confirmClear by remember { mutableStateOf(false) }
+    var clearing by remember { mutableStateOf(false) }
+    SubScreen(stringResource(R.string.dev_tools), onBack) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            LanDebugCard()
+            Surface(color = Dash.Tile, shape = RoundedCornerShape(20.dp)) {
+                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(stringResource(R.string.dev_diagnostics), style = MaterialTheme.typography.titleMedium)
+                    OutlinedButton(onClick = { context.startActivity(Intent(context, ConnectionDiagnosticsActivity::class.java)) },
+                        modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.dev_diagnostics)) }
+                    OutlinedButton(enabled = !clearing, onClick = { confirmClear = true },
+                        modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.dev_clear_logs)) }
+                }
+            }
+            Surface(color = Dash.Tile, shape = RoundedCornerShape(20.dp)) {
+                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(stringResource(R.string.dev_preview), style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(R.string.dev_preview_desc), color = Dash.Muted, style = MaterialTheme.typography.bodyMedium)
+                    Button(onClick = { context.startActivity(Intent(context, AaPreviewActivity::class.java)) },
+                        modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.dev_preview)) }
+                }
+            }
         }
-
-        root.addView(TextView(this).apply {
-            text = getString(R.string.dev_tools)
-            setTextColor(Color.parseColor("#F2F5F7"))
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 26f)
-            setPadding(0, 0, 0, dp(20))
-        })
-
-        root.addView(button(getString(R.string.dev_export_log)) { exportLatestLog() })
-        root.addView(button(getString(R.string.dev_save_log)) { saveLogToDownloads() })
-        root.addView(button(getString(R.string.dev_clear_logs)) { clearLogs() })
-
-        root.addView(section(getString(R.string.dev_preview_desc)))
-
-        root.addView(button(getString(R.string.dev_preview)) {
-            startActivity(Intent(this@DeveloperToolsActivity, dev.caraalink.aa.AaPreviewActivity::class.java))
-        })
-        root.addView(button(getString(R.string.dev_diagnostics)) {
-            startActivity(Intent(this@DeveloperToolsActivity, ConnectionDiagnosticsActivity::class.java))
-        })
-        setContentView(
-            ScrollView(this).apply {
-                addView(root, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
-            },
-        )
     }
-
-    private fun section(text: String) = TextView(this).apply {
-        this.text = text
-        setTextColor(Color.parseColor("#9AA7B2"))
-        setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
-        setPadding(0, dp(16), 0, dp(8))
-    }
-
-    private fun button(label: String, onClick: () -> Unit) = MaterialButton(
-        this,
-        null,
-        com.google.android.material.R.attr.materialButtonOutlinedStyle,
-    ).apply {
-        text = label
-        isAllCaps = false
-        textSize = 15f
-        setOnClickListener { onClick() }
-        layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(52)).apply {
-            topMargin = dp(6)
-        }
-        cornerRadius = dp(16)
-        setTextColor(Color.parseColor("#F2F5F7"))
-        strokeColor = ColorStateList.valueOf(Color.parseColor("#2C3640"))
-        strokeWidth = dp(1)
-        rippleColor = ColorStateList.valueOf(Color.parseColor("#4036C9C6"))
-    }
-
-    private fun dp(value: Int): Int =
-        TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, value.toFloat(), resources.displayMetrics).toInt()
-
-    private fun exportLatestLog() {
-        // Every subsystem's DiagnosticLogger now writes into the one shared,
-        // already-interleaved current log file -- nothing to merge anymore.
-        val logger = DiagnosticLogger(this, "app")
-        val file = logger.latestLogFile()
-        if (!file.exists() || file.length() == 0L) {
-            Toast.makeText(this, getString(R.string.dev_no_logs), Toast.LENGTH_LONG).show()
-            return
-        }
-        Log.i(TAG, "exportLatestLog: sharing ${file.name} (${file.length()} bytes)")
-        Toast.makeText(this, getString(R.string.dev_sharing, file.name), Toast.LENGTH_SHORT).show()
-        startActivity(
-            Intent.createChooser(
-                logger.shareFileIntent(file),
-                getString(R.string.dev_share_logs),
-            )
-        )
-    }
-
-    private fun clearLogs() {
-        DiagnosticLogger.clearAll(this)
-        Toast.makeText(this, getString(R.string.dev_logs_cleared), Toast.LENGTH_SHORT).show()
-    }
-
-    private fun saveLogToDownloads() {
-        val logger = DiagnosticLogger(this, "app")
-        val file = logger.latestLogFile()
-        if (!file.exists() || file.length() == 0L) {
-            Toast.makeText(this, getString(R.string.dev_no_logs), Toast.LENGTH_LONG).show()
-            return
-        }
-        val name = logger.saveToDownloads(file)
-        Toast.makeText(
-            this,
-            if (name != null) getString(R.string.dev_saved_downloads, name) else getString(R.string.dev_save_failed),
-            Toast.LENGTH_LONG,
-        ).show()
-    }
+    if (confirmClear) AlertDialog(
+        onDismissRequest = { confirmClear = false },
+        title = { Text(stringResource(R.string.dev_clear_logs)) },
+        text = { Text(stringResource(R.string.dev_clear_logs_confirm)) },
+        confirmButton = {
+            TextButton(onClick = {
+                confirmClear = false
+                clearing = true
+                scope.launch {
+                    try {
+                        withContext(Dispatchers.IO) { DiagnosticLogger.clearAll(context) }
+                        Toast.makeText(context, R.string.dev_logs_cleared, Toast.LENGTH_SHORT).show()
+                    } finally { clearing = false }
+                }
+            }) { Text(stringResource(R.string.action_delete)) }
+        },
+        dismissButton = { TextButton(onClick = { confirmClear = false }) { Text(stringResource(R.string.action_cancel)) } },
+    )
 }

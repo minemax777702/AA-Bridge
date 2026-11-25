@@ -37,6 +37,11 @@ data class ConnectionSnapshot(
     val suggestion: NearbyDevice? = null,
     /** The car the wireless search is for; kept after NOT_FOUND or FAILED so Try again retries it. */
     val target: RememberedCar? = null,
+    /** Debug emulator session (including the waiting phase); never a real car. */
+    val emulatorActive: Boolean = false,
+    /** GPS velocity is diagnostic data, not vehicle parking state. */
+    val phoneGpsSpeedMps: Float? = null,
+    val phoneGpsSpeedElapsedNanos: Long = 0L,
 )
 
 /**

@@ -80,6 +80,17 @@ internal class CarbitAudioTransport(
         return false
     }
 
+    @Synchronized fun diagnosticAvailable(stream: Stream): Boolean {
+        expireRequests()
+        return stream in allowed && !playbackFailed && active.isEmpty() && pending == null &&
+            stopping.isEmpty() && micState == MicState.IDLE
+    }
+
+    @Synchronized fun diagnosticStarted(stream: Stream): Boolean {
+        expireRequests()
+        return stream in active && stream !in stopping && !playbackFailed
+    }
+
     fun playMusic(pcm: ByteArray) = play(Stream.MUSIC, pcm)
 
     @Synchronized

@@ -21,6 +21,16 @@ class AaMicCapture(private val context: Context, private val onChunk: (ByteArray
     }
 
     private val logger = DiagnosticLogger(context, "aa-mic")
+    private val huSession = dev.caraalink.diagnostics.HuCompatibility.state.value.sessionId
+    private fun reportInput(rec: AudioRecord, peak: Int? = null) {
+        val path = when (rec.routedDevice?.type) {
+            AudioDeviceInfo.TYPE_BUILTIN_MIC -> "PHONE"
+            AudioDeviceInfo.TYPE_BLUETOOTH_SCO -> "BT_SCO"
+            null -> "UNKNOWN"
+            else -> "ANDROID_INPUT"
+        }
+        dev.caraalink.diagnostics.HuCompatibility.microphone(huSession, path, peak, rec.activeRecordingConfiguration?.isClientSilenced)
+    }
     @Volatile private var record: AudioRecord? = null
     private var thread: Thread? = null
 
@@ -48,6 +58,7 @@ class AaMicCapture(private val context: Context, private val onChunk: (ByteArray
             rec.startRecording()
             check(rec.recordingState == AudioRecord.RECORDSTATE_RECORDING) { "AudioRecord did not start" }
             record = rec
+            runCatching { reportInput(rec) }
             logger.log("Microphone started, device=${rec.routedDevice?.type}")
             true
         } catch (e: Exception) {
@@ -100,6 +111,7 @@ class AaMicCapture(private val context: Context, private val onChunk: (ByteArray
                                         ?.getDevices(AudioManager.GET_DEVICES_INPUTS)
                                         ?.none { it.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO } == true)
                             ) selectInput(rec)
+                            reportInput(rec, peak)
                             logger.log("peak=$peak silenced=${rec.activeRecordingConfiguration?.isClientSilenced} device=${rec.routedDevice?.type}")
                         }
                         peak = 0

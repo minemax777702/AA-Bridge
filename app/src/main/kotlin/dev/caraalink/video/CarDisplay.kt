@@ -23,7 +23,7 @@ class CarDisplay(
     private val context: Context,
     private val onOpenAa: () -> Unit,
 ) {
-    enum class Mode { STATUS, AA }
+    enum class Mode { STATUS, AA, CALIBRATION }
 
     private val main = Handler(Looper.getMainLooper())
     private val logger = DiagnosticLogger(context, "car-display")
@@ -81,6 +81,11 @@ class CarDisplay(
         showCurrent()
     }
 
+    internal fun showCalibration() = main.post {
+        mode = Mode.CALIBRATION
+        showCurrent()
+    }
+
     private var aaVideoSize: Pair<Int, Int>? = null
     private var aaMargin: Pair<Int, Int> = 0 to 0
     private var aaOnSurface: ((Surface?) -> Unit)? = null
@@ -93,6 +98,7 @@ class CarDisplay(
         presentation = try {
             when {
                 mode == Mode.AA && aaVideoSize != null -> aaPresentation(display)
+                mode == Mode.CALIBRATION -> HuCalibrationPresentation(context, display) { dev.caraalink.diagnostics.HuDiagnosticTools.state.value.samples }
                 else -> {
                     mode = Mode.STATUS
                     CarStatusPresentation(context, display, screen, onOpenAa)
@@ -157,7 +163,10 @@ class CarDisplay(
     }
 
     /** Draws the current screen again, so a still picture still gives the encoder a fresh frame. */
-    fun redraw() = main.post { presentation?.window?.decorView?.invalidate() }
+    fun redraw() = main.post {
+        (presentation as? HuCalibrationPresentation)?.refresh()
+        presentation?.window?.decorView?.invalidate()
+    }
 
     fun release() = main.post {
         cancelTouchNow()

@@ -34,7 +34,7 @@
     <string name="home_wifi_off_body">AA Bridge needs Wi-Fi on to reach your car. You don\'t have to join a network.</string>
     <string name="home_wifi_settings">Wi-Fi settings</string>
     <string name="home_disconnect">Disconnect</string>
-    <string name="home_send_logs">Send logs</string>
+    <string name="home_send_logs">Share diagnostics</string>
     <string name="home_needs_tap_title">Start Android Auto</string>
     <string name="home_needs_tap_body">Its server is off. One tap fixes it.</string>
     <string name="home_connected_title">Connected</string>
@@ -102,4 +102,21 @@
     <string name="link_wireless_short">Wireless</string>
     <string name="link_cable_short">Cable</string>
 
+    <string name="ui_active">Active</string>
+    <string name="ui_inactive">Inactive</string>
+    <string name="ui_not_connected">Not connected</string>
+    <string name="ui_setup_step">Step %1$d of 4</string>
+    <string name="ui_setup_later">Connect later</string>
+    <string name="ui_connection_details">Connection details</string>
+    <string name="ui_settings_advanced_summary">Display, audio, connection and diagnostics</string>
+    <string name="ui_brand_name" translatable="false">AA Bridge</string>
+    <string name="lan_debug_title">LAN debugging</string>
+    <string name="lan_debug_summary">Connect the Windows emulator on a trusted local network. Traffic after authentication is not encrypted.</string>
+    <string name="lan_debug_start">Start debug session</string>
+    <string name="lan_debug_ip">IP: %1$s</string>
+    <string name="lan_debug_wait">Enter this 10-character code on the computer. Connect within 2 minutes.</string>
+    <string name="lan_debug_running">Debug session active or waiting for connection.</string>
+    <string name="lan_debug_disconnect">Disconnect the real car first.</string>
+    <string name="lan_debug_no_wifi">Connect the phone to Wi-Fi first.</string>
+    <string name="lan_stationary_test_only">Stationary test bench only. Never use this mode in a moving vehicle.</string>
 </resources>

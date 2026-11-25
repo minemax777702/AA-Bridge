@@ -21,6 +21,12 @@ class PxcChannel(
     private val replyBody: (cmd: Int) -> ByteArray? = { null },
 ) : AdbTransport.StreamHandler {
 
+    internal var observer: ((Int, ByteArray) -> Unit)? = null
+    internal var txObserver: ((Int, ByteArray) -> Unit)? = null
+    private fun writeControl(stream: MirrorStream, cmd: Int, body: ByteArray, extra: Int = 0) {
+        txObserver?.invoke(cmd, body)
+        stream.write(head(cmd, body, extra))
+    }
     private val buffers = HashMap<Int, ByteArray>()
     private val channelOf = HashMap<Int, Int>()
     internal val carbitAudio = CarbitAudioTransport(::sendCarbitAudio, logger::log)
@@ -52,6 +58,7 @@ class PxcChannel(
         val stream = p2cStream?.takeIf { !it.closed } ?: return false
         if ((cmd and 0xFF000000.toInt()) == 0x60000000 && stream.backlogAgeMs() > 150) return false
         return runCatching {
+            if ((cmd and 0xFF000000.toInt()) != 0x60000000) txObserver?.invoke(cmd, body)
             stream.write(head(cmd, body, 0))
             !stream.closed
         }.onFailure { logger.log("Carbit audio write failed: $it") }.getOrDefault(false)
@@ -61,7 +68,7 @@ class PxcChannel(
     fun sendP2C(cmd: Int, body: ByteArray): Boolean {
         val s = p2cStream?.takeIf { !it.closed } ?: return false
         logger.log("PXC P2C send 0x${hex(cmd)} len=${body.size}" + preview(body))
-        s.write(head(cmd, body, 0))
+        writeControl(s, cmd, body)
         return true
     }
 
@@ -94,7 +101,7 @@ class PxcChannel(
             val bb = ByteBuffer.wrap(buf, 0, 16).order(ByteOrder.LITTLE_ENDIAN)
             val cmd = bb.getInt(0)
             val total = bb.getInt(4)
-            if (cmd xor total != bb.getInt(8) || total < 16) {
+            if (cmd xor total != bb.getInt(8) || total < 16 || total > 4 * 1024 * 1024) {
                 logger.log("PXC bad head on ${stream.localId}, dropping ${buf.size} bytes")
                 buf = ByteArray(0)
                 break
@@ -108,10 +115,11 @@ class PxcChannel(
     }
 
     private fun handle(stream: MirrorStream, cmd: Int, extra: Int, body: ByteArray) {
+        observer?.invoke(cmd, body)
         if (channelOf[stream.localId] == null) {
             channelOf[stream.localId] = cmd
             logger.log("PXC channel open 0x${hex(cmd)} on stream ${stream.localId}")
-            stream.write(head(cmd + 1, ByteArray(0), extra))
+            writeControl(stream, cmd + 1, ByteArray(0), extra)
             if (cmd == P2C_CHANNEL) {
                 if (p2cStream != null && p2cStream !== stream) carbitAudio.reset()
                 p2cStream = stream
@@ -131,7 +139,7 @@ class PxcChannel(
             return
         }
         if (cmd != HEARTBEAT && cmd != 0x10750 && cmd != 0x10430) {
-            logger.log("PXC C2P 0x${hex(cmd)} len=${body.size}" + preview(body))
+            logger.log("PXC C2P 0x${hex(cmd)} len=${body.size}" + if (cmd == CarbitAudioTransport.CAPABILITIES) preview(body) else "")
         }
         when {
             cmd == CLIENT_INFO -> {
@@ -140,7 +148,7 @@ class PxcChannel(
                     carbitAudio.updateMicAllowed(info.opt("supportMic") == true)
                     onClientInfo(info)
                 }.onFailure { carbitAudio.updateMicAllowed(false) }
-                stream.write(head(cmd + 1, clientInfoReply(), 0))
+                writeControl(stream, cmd + 1, clientInfoReply())
             }
             cmd == CarbitAudioTransport.CAPABILITIES -> {
                 val allowed = runCatching {
@@ -149,10 +157,10 @@ class PxcChannel(
                         info.opt(it.name.lowercase(java.util.Locale.ROOT)) == true
                     }.toSet()
                 }.getOrDefault(emptySet())
-                stream.write(head(cmd + 1, ByteArray(0), extra))
+                writeControl(stream, cmd + 1, ByteArray(0), extra)
                 carbitAudio.updateCapabilities(allowed)
             }
-            needsReply(cmd) -> stream.write(head(cmd + 1, replyBody(cmd) ?: ByteArray(0), 0))
+            needsReply(cmd) -> writeControl(stream, cmd + 1, replyBody(cmd) ?: ByteArray(0))
         }
     }
 

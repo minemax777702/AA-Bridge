@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="caraalink_background">#0E1116</color>
-    <color name="caraalink_primary">#36C9C6</color>
-    <color name="caraalink_primary_dark">#1E8E8B</color>
-    <color name="caraalink_text_primary">#F2F5F7</color>
-    <color name="caraalink_text_secondary">#9AA7B2</color>
+    <color name="caraalink_background">#101216</color>
+    <color name="caraalink_primary">#A7C7FF</color>
+    <color name="caraalink_primary_dark">#25354E</color>
+    <color name="caraalink_text_primary">#F1F3F7</color>
+    <color name="caraalink_text_secondary">#ADB3BF</color>
     <color name="ic_launcher_background">#0F766E</color>
 </resources>

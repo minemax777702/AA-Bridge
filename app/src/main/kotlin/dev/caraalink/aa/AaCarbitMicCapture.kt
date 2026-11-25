@@ -13,6 +13,7 @@ internal class AaCarbitMicCapture(
     private val onChunk: (ByteArray) -> Unit,
 ) {
     private val logger = DiagnosticLogger(context, "aa-carbit-mic")
+    private val huSession = dev.caraalink.diagnostics.HuCompatibility.state.value.sessionId
     @Volatile private var running = false
     private var first: ByteArray? = null
     private var worker: Thread? = null
@@ -35,6 +36,7 @@ internal class AaCarbitMicCapture(
             return false
         }
         first = chunk
+        dev.caraalink.diagnostics.HuCompatibility.microphone(huSession, "CARBIT_PCM")
         running = true
         return true
     }
@@ -78,6 +80,7 @@ internal class AaCarbitMicCapture(
             logger.log("Carbit microphone stalled; switched to local input")
         } else {
             running = false
+            dev.caraalink.diagnostics.HuCompatibility.microphone(huSession, "UNAVAILABLE")
             logger.log("Carbit microphone and local fallback unavailable")
         }
     }

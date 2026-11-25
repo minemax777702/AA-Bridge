@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="hu_extra_show">Advanced automatic and manual tests</string>
+    <string name="hu_extra_hide">Hide advanced tests</string>
+    <string name="hu_extra_audio">Test audio signals</string>
+    <string name="hu_extra_closed">Exit Android Auto on the HU first (keep the link connected). Stop other audio and lower volume before testing.</string>
+    <string name="hu_extra_audio_hint">Short low-level tones: left, right, both channels. Mono TTS uses three consecutive tones. System audio does not exercise the Android Auto media pipeline. Confirm what you actually hear.</string>
+    <string name="hu_extra_auto_signals">Run all available signal tests</string>
+    <string name="hu_extra_manual_signal">Play this signal</string>
+    <string name="hu_extra_stop">Stop</string>
+    <string name="hu_extra_signal_sent">Signal sent; audibility not confirmed</string>
+    <string name="hu_extra_signal_failed">Unavailable / transmission failed</string>
+    <string name="hu_extra_silent">No sound</string>
+    <string name="hu_extra_distorted">Distorted / interrupted</string>
+    <string name="hu_extra_system">Android system audio route</string>
+    <string name="hu_extra_pcm_music">CarbitLink MUSIC · stereo 48 kHz</string>
+    <string name="hu_extra_pcm_tts">CarbitLink TTS · mono 16 kHz</string>
+    <string name="hu_extra_calibration">Touchscreen calibration</string>
+    <string name="hu_extra_cal_hint">Exit Android Auto on the HU while keeping the link. Tap the nine highlighted targets on the HU, one at a time. Correction applies only to this connection.</string>
+    <string name="hu_extra_cal_start">Show calibration on HU</string>
+    <string name="hu_cal_screen">Tap highlighted target · %1$d / %2$d</string>
+    <string name="hu_extra_cal_errors">Max normalized error: before %1$.1f%% · after %2$.1f%%</string>
+    <string name="hu_extra_cal_valid">Independent check passed</string>
+    <string name="hu_extra_cal_invalid">Calibration unreliable; retry</string>
+    <string name="hu_extra_cal_apply">Apply correction for this connection</string>
+    <string name="hu_extra_cal_reset">Reset calibration</string>
+    <string name="hu_extra_compare">Compare original CarbitLink protocol</string>
+    <string name="hu_extra_compare_hint">Import an authorized original text trace and AA-Bridge log. Format: RX PXC 0x10010 len=80 (direction from phone perspective). Compare observed command codes and payload lengths, not raw audio/video. Missing messages may be caused by incomplete captures.</string>
+    <string name="hu_extra_reference">Import CarbitLink reference</string>
+    <string name="hu_extra_bridge">Import AA-Bridge trace</string>
+    <string name="hu_extra_current_log">Use latest local AA-Bridge log</string>
+    <string name="hu_extra_trace_count">Unique commands: %1$d · records: %2$d</string>
+    <string name="hu_extra_trace_truncated">Input limited to 2 MiB / 30000 lines; comparison may be incomplete.</string>
+    <string name="hu_extra_trace_error">No supported trace records or import failed.</string>
+    <string name="hu_extra_compare_run">Compare traces</string>
+    <string name="hu_extra_diff_count">Different command inventories / lengths: %1$d</string>
+    <string name="hu_extra_diff_limit">First 128 differences shown.</string>
+    <string name="hu_extra_pcm_vr">CarbitLink VR · mono 16 kHz</string>
+    <string name="hu_extra_pcm_talkie">CarbitLink TALKIE · mono 16 kHz</string>
+</resources>

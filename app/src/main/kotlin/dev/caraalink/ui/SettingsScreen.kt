@@ -2,6 +2,9 @@ package dev.caraalink.ui
 
 import android.content.Intent
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -15,6 +18,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
@@ -54,16 +58,17 @@ import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.LayoutDirection
 import dev.caraalink.R
 import dev.caraalink.settings.SettingsActivity
+import dev.caraalink.settings.HuCompatibilityActivity
 
 /** Page with a back arrow and a title; Settings, Help and About share it. */
 @Composable
 fun SubScreen(title: String, onBack: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
-    Surface(Modifier.fillMaxSize().dashGlow(Dash.GlowIdle), color = Color.Transparent, contentColor = Dash.Text) {
+    Surface(Modifier.fillMaxSize().background(Dash.Background), color = Color.Transparent, contentColor = Dash.Text) {
         Column(Modifier.fillMaxSize().systemBarsPadding()) {
             Row(Modifier.padding(horizontal = 8.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = null, tint = Dash.Teal) }
                 Spacer(Modifier.width(2.dp))
-                Text(title.uppercase(), color = Dash.Teal, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.5.sp)
+                Text(title, color = Dash.Text, style = MaterialTheme.typography.titleLarge)
             }
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), content = content)
         }
@@ -74,13 +79,25 @@ fun SubScreen(title: String, onBack: () -> Unit, content: @Composable ColumnScop
 fun SettingsScreen(onBack: () -> Unit, onHelp: () -> Unit, onAbout: () -> Unit) {
     val context = LocalContext.current
     SubScreen(stringResource(R.string.settings), onBack) {
+        Spacer(Modifier.height(12.dp))
         WirelessCarRow()
         DashGroup {
-            SettingsRow(painterResource(R.drawable.ic_help), stringResource(R.string.help), onClick = onHelp)
-            SettingsRow(rememberVectorPainter(Icons.Rounded.Info), stringResource(R.string.settings_about), onClick = onAbout)
-            SettingsRow(painterResource(R.drawable.ic_tune), stringResource(R.string.settings_advanced)) {
+            SettingsRow(painterResource(R.drawable.ic_tune), stringResource(R.string.settings_advanced),
+                stringResource(R.string.ui_settings_advanced_summary)) {
                 context.startActivity(Intent(context, SettingsActivity::class.java))
             }
+            HorizontalDivider(Modifier.padding(start = 68.dp), color = Dash.TileBorder)
+            SettingsRow(painterResource(R.drawable.ic_car), stringResource(R.string.hu_compat_title),
+                stringResource(R.string.hu_compat_summary)) {
+                context.startActivity(Intent(context, HuCompatibilityActivity::class.java))
+            }
+        }
+        DashGroup {
+            SettingsRow(painterResource(R.drawable.ic_help), stringResource(R.string.help), onClick = onHelp)
+            HorizontalDivider(Modifier.padding(start = 68.dp), color = Dash.TileBorder)
+            SettingsRow(rememberVectorPainter(Icons.Rounded.Info), stringResource(R.string.settings_about), onClick = onAbout)
+            HorizontalDivider(Modifier.padding(start = 68.dp), color = Dash.TileBorder)
+            Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) { SendLogsLink() }
         }
         Byline(Modifier.padding(horizontal = 24.dp, vertical = 16.dp))
     }
@@ -113,7 +130,7 @@ private fun WirelessCarRow() {
 private fun DashGroup(content: @Composable ColumnScope.() -> Unit) {
     val shape = RoundedCornerShape(18.dp)
     Column(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp).clip(shape).background(Dash.Tile).border(1.dp, Dash.TileBorder, shape),
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp).clip(shape).background(Dash.Tile),
         content = content,
     )
 }
@@ -126,7 +143,11 @@ private fun SettingsRow(icon: Painter, label: String, supporting: String? = null
     ListItem(
         headlineContent = { Text(label, style = MaterialTheme.typography.bodyLarge.merge(own)) },
         supportingContent = supporting?.let { { Text(it, color = Dash.Muted, style = LocalTextStyle.current.merge(own)) } },
-        leadingContent = { Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+        leadingContent = {
+            Box(Modifier.size(40.dp).background(Dash.GlowTeal, RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
+                Icon(icon, contentDescription = null, tint = Dash.Teal, modifier = Modifier.size(22.dp))
+            }
+        },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         modifier = Modifier.clickable(onClick = onClick),
     )

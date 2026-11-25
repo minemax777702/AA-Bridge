@@ -368,18 +368,15 @@ object AaServiceDiscovery {
             .string(8, "0.1.0")       // head_unit_software_version
             .build()
 
-        // SensorSourceService.sensors (field 1, repeated Sensor{sensor_type=1
-        // required}). openauto's SensorService::fillFeatures() advertises
-        // exactly these three (driving status, location, night mode); matched
-        // byte-for-byte rather than left empty, since it's cheap and this is a
-        // known-good reference.
+        // Keep the existing driving-status declaration for compatibility.
+        // Only the authenticated debug test bench simulates its stationary status.
+        // Do not advertise vehicle GPS; no AA location events are implemented.
         val sensorService = AaProtobuf.Writer()
             .int(1, CHANNEL_SENSOR)
             .message(
                 2,
                 AaProtobuf.Writer()
                     .message(1, AaProtobuf.Writer().int(1, SENSOR_DRIVING_STATUS_DATA).build())
-                    .message(1, AaProtobuf.Writer().int(1, SENSOR_LOCATION).build())
                     .message(1, AaProtobuf.Writer().int(1, SENSOR_NIGHT_MODE).build())
                     .build(),
             )
