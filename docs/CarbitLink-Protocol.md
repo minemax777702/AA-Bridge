@@ -226,8 +226,37 @@ Music wire type is 4 (SDK enum 8 is mapped to JSON type 4). PCM S16_LE
 format 3 is from the DEX EPAudioFormatType enum. Use 48000 Hz stereo for
 the decoded AA media channel. The existing PXC framing is reused.
 
-The optional experimental mode only sends music after a positive music
-capability and matching start ACK. It uses local playback during setup,
-on timeout, or when the link is congested. No audio is logged. The car's
-actual playback, microphone availability, TTS and VR routing are not
-confirmed by a live capture; the microphone remains the phone/SCO path.
+### Additional audio and microphone findings
+
+- `sendAudioData` table at 0x1392e0 maps SDK types 1, 2, 4, 8
+  to 0x60000000, 0x60000010, 0x60000020, 0x60000030.
+- `sendAudioStart` and `sendAudioStop` map SDK enum values to
+  JSON types 1 (TTS), 2 (VR), 3 (Talkie), 4 (Music).
+- `handleEnableDownloadPhoneAudio` at 0x1c0240 reads boolean
+  `tts`, `vr`, `talkie`, `music`; each must explicitly be true.
+- `handleClientInfo` at 0x1bef68 checks boolean `supportMic` and calls
+  `EPAudioManager::enableAudioRecod` at 0x1befe8.
+- `startAudioRecord` sends JSON sampleRate/channel/format without a
+  type; `stopAudioRecord` has an empty body. Mic data ACK echoes
+  the extra field and has an empty body (0x1c07e8–0x1c0800).
+- Start/stop playback ACKs have no validated stream correlation in
+  the SDK. The implementation serializes pending playback requests.
+  A timeout disables remote playback until a new connection.
+
+### AA integration and limitations
+
+Opt-in CarbitLink audio negotiates the existing AAC media sink plus a
+16 kHz/16-bit/mono speech sink (AA AudioType SPEECH=1, see
+https://github.com/mrmees/open-android-auto/blob/main/docs/channels/audio.md).
+Selecting VR during mic requests or transient audio focus is an integration
+heuristic, not a proven semantic mapping. Low-level Talkie is implemented
+and tested; no AA telephony/PTT source is mapped to it without more
+evidence. Calls keep the Bluetooth/OS path. PCM formats are the chosen AA
+formats, not a firmware guarantee.
+
+The mic checkbox is off by default and requires CarbitLink audio mode,
+RECORD_AUDIO, supportMic=true, start ACK and actual PCM. Only an AA
+microphone request starts it. Data is bounded, never logged, discarded
+on close. Missing/stalled mic data falls back to local capture. Output
+falls back to phone/Bluetooth if unsupported, congested or unacknowledged.
+No QDLink wire changes. All paths need real-vehicle verification.

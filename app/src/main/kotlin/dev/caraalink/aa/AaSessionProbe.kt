@@ -667,16 +667,26 @@ class AaSessionProbe(
                         if (message.channelId == AaServiceDiscovery.CHANNEL_MEDIA_SINK_SPEECH_AUDIO) {
                             val kind = speechKind()
                             audioExecutor.execute {
+                                if (activeChannel !== channel || !running.get()) return@execute
                                 speechPlayer?.stop()
                                 carbitAudio?.stopStream(speechStream)
                                 speechStream = kind
                                 if (carbitEnabled()) carbitAudio?.startStream(kind)
+                                var remoteEligible = carbitEnabled()
                                 speechPlayer = AaPcmPlayer(context, config.preview) { pcm ->
-                                    carbitEnabled() && carbitAudio?.play(kind, pcm) == true
+                                    // Avoid splitting a short spoken prompt between speakers
+                                    // when the first frame arrives before the remote start ACK.
+                                    val accepted = remoteEligible && carbitEnabled() &&
+                                        carbitAudio?.play(kind, pcm) == true
+                                    if (!accepted && remoteEligible) {
+                                        remoteEligible = false
+                                        carbitAudio?.stopStream(kind)
+                                    }
+                                    accepted
                                 }
                             }
                         } else if (message.channelId == AaServiceDiscovery.CHANNEL_MEDIA_SINK_MEDIA_AUDIO && !phoneMediaAudio && carbitEnabled()) {
-                            audioExecutor.execute { if (carbitEnabled()) carbitAudio?.startStream(CarbitAudioTransport.Stream.MUSIC) }
+                            audioExecutor.execute { if (activeChannel === channel && carbitEnabled()) carbitAudio?.startStream(CarbitAudioTransport.Stream.MUSIC) }
                         }
                     } else if (chId == AaFraming.MSG_MEDIA_DATA && message.channelId == AaServiceDiscovery.CHANNEL_MEDIA_SINK_VIDEO) {
                         // handleMediaWithTimestampIndication(): payload is an
@@ -756,13 +766,14 @@ class AaSessionProbe(
                         // PCM has an eight-byte timestamp on DATA; config is not sound.
                         if (chId == AaFraming.MSG_MEDIA_DATA && chBody.size > 8) {
                             val pcm = chBody.copyOfRange(8, chBody.size)
-                            audioExecutor.execute { speechPlayer?.feed(pcm) }
+                            audioExecutor.execute { if (activeChannel === channel && running.get()) speechPlayer?.feed(pcm) }
                         }
                         sendAvAck(channel, message.channelId)
                     } else if (chId == AaFraming.MSG_MEDIA_STOP &&
                         message.channelId == AaServiceDiscovery.CHANNEL_MEDIA_SINK_SPEECH_AUDIO
                     ) {
                         audioExecutor.execute {
+                            if (activeChannel !== channel) return@execute
                             speechPlayer?.stop()
                             speechPlayer = null
                             carbitAudio?.stopStream(speechStream)
@@ -770,7 +781,7 @@ class AaSessionProbe(
                     } else if (chId == AaFraming.MSG_MEDIA_STOP &&
                         message.channelId == AaServiceDiscovery.CHANNEL_MEDIA_SINK_MEDIA_AUDIO
                     ) {
-                        audioExecutor.execute { carbitAudio?.stopStream(CarbitAudioTransport.Stream.MUSIC) }
+                        audioExecutor.execute { if (activeChannel === channel) carbitAudio?.stopStream(CarbitAudioTransport.Stream.MUSIC) }
                     } else if (chId == AaFraming.MSG_MEDIA_VIDEO_FOCUS_REQUEST) {
                         // NATIVE(2) is the driver's Exit (as openauto reads it) unless the reason is PHONE_SCREEN_OFF(1). Phones
                         // also send one at startup, so it only counts once video has arrived on this connection.

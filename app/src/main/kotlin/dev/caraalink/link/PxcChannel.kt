@@ -37,6 +37,8 @@ class PxcChannel(
             stopHeartbeat(stream)
             carbitAudio.reset()
         } else if (channel == 0x10000) {
+            carbitAudio.stopMic()
+            carbitAudio.stopPlayback()
             carbitAudio.reset()
         }
     }
@@ -111,6 +113,7 @@ class PxcChannel(
             logger.log("PXC channel open 0x${hex(cmd)} on stream ${stream.localId}")
             stream.write(head(cmd + 1, ByteArray(0), extra))
             if (cmd == P2C_CHANNEL) {
+                if (p2cStream != null && p2cStream !== stream) carbitAudio.reset()
                 p2cStream = stream
                 startHeartbeat(stream)
             }
