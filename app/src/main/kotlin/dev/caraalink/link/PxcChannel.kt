@@ -48,7 +48,7 @@ class PxcChannel(
      * using the transport's existing queue-age measurement. */
     private fun sendCarbitAudio(cmd: Int, body: ByteArray): Boolean {
         val stream = p2cStream?.takeIf { !it.closed } ?: return false
-        if (cmd == CarbitAudioTransport.MUSIC && stream.backlogAgeMs() > 150) return false
+        if ((cmd and 0xFF000000.toInt()) == 0x60000000 && stream.backlogAgeMs() > 150) return false
         return runCatching {
             stream.write(head(cmd, body, 0))
             !stream.closed
@@ -118,8 +118,13 @@ class PxcChannel(
         }
         if (channelOf[stream.localId] == P2C_CHANNEL) {
             // Replies to our requests; never answer these.
-            if (cmd == CarbitAudioTransport.START_ACK || cmd == CarbitAudioTransport.STOP_ACK) carbitAudio.onReply(cmd)
+            if (p2cStream === stream) carbitAudio.onReply(cmd)
             if (cmd != HEARTBEAT + 1) logger.log("PXC P2C reply 0x${hex(cmd)} len=${body.size}" + preview(body))
+            return
+        }
+        if (cmd == CarbitAudioTransport.MIC_DATA) {
+            stream.write(head(CarbitAudioTransport.MIC_DATA_ACK, ByteArray(0), extra))
+            carbitAudio.onMicData(body)
             return
         }
         if (cmd != HEARTBEAT && cmd != 0x10750 && cmd != 0x10430) {
@@ -127,15 +132,22 @@ class PxcChannel(
         }
         when {
             cmd == CLIENT_INFO -> {
-                runCatching { onClientInfo(JSONObject(String(body, Charsets.UTF_8))) }
+                runCatching {
+                    val info = JSONObject(String(body, Charsets.UTF_8))
+                    carbitAudio.updateMicAllowed(info.opt("supportMic") == true)
+                    onClientInfo(info)
+                }.onFailure { carbitAudio.updateMicAllowed(false) }
                 stream.write(head(cmd + 1, clientInfoReply(), 0))
             }
             cmd == CarbitAudioTransport.CAPABILITIES -> {
                 val allowed = runCatching {
-                    JSONObject(String(body, Charsets.UTF_8)).optBoolean("music", false)
-                }.getOrDefault(false)
-                carbitAudio.updateMusicAllowed(allowed)
+                    val info = JSONObject(String(body, Charsets.UTF_8))
+                    CarbitAudioTransport.Stream.entries.filter {
+                        info.opt(it.name.lowercase(java.util.Locale.ROOT)) == true
+                    }.toSet()
+                }.getOrDefault(emptySet())
                 stream.write(head(cmd + 1, ByteArray(0), extra))
+                carbitAudio.updateCapabilities(allowed)
             }
             needsReply(cmd) -> stream.write(head(cmd + 1, replyBody(cmd) ?: ByteArray(0), 0))
         }

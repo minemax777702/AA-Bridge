@@ -1,96 +1,222 @@
 package dev.caraalink.link
 
+import java.util.concurrent.ArrayBlockingQueue
+import java.util.concurrent.TimeUnit
+
 /**
- * Experimental music channel, isolated from Android Auto and the video transport.
- * Wire facts: CarbitLink 6.5.1 arm64 libEPSDK.so, P2CMainService::sendAudioStart,
- * sendAudioData and sendAudioStop. See docs/CarbitLink-Protocol.md.
- *
- * The reader thread handles acknowledgments; the audio worker never waits for
- * one. Until the start ACK arrives, the caller continues local playback.
+ * Experimental PXC PCM transport. One outstanding playback control command:
+ * the SDK's start/stop replies identify the command, not the audio type.
+ * Wire facts and remaining assumptions: docs/CarbitLink-Protocol.md.
  */
 internal class CarbitAudioTransport(
     private val send: (Int, ByteArray) -> Boolean,
     private val log: (String) -> Unit,
     private val nowMs: () -> Long = { System.nanoTime() / 1_000_000L },
 ) {
-    private enum class State { IDLE, STARTING, PLAYING, STOPPING, FAILED }
+    enum class Stream(val wireType: Int, val command: Int, val rate: Int, val channels: Int) {
+        TTS(1, 0x60000000, 16_000, 1),
+        VR(2, 0x60000010, 16_000, 1),
+        TALKIE(3, 0x60000020, 16_000, 1),
+        MUSIC(4, 0x60000030, 48_000, 2);
 
-    private var state = State.IDLE
-    private var musicAllowed = false
-    private var deadline = 0L
-
-    @Synchronized
-    fun updateMusicAllowed(allowed: Boolean) {
-        if (musicAllowed == allowed) return
-        musicAllowed = allowed
-        if (!allowed) stopPlayback()
-        log("Carbit audio: music allowed=$allowed")
+        fun startBody() = """{"type":$wireType,"sampleRate":$rate,"channel":$channels,"format":3}""".toByteArray(Charsets.UTF_8)
+        fun stopBody() = """{"type":$wireType}""".toByteArray(Charsets.UTF_8)
     }
 
-    /** True only if the complete PCM block was accepted for remote transmission. */
+    private data class Pending(val stream: Stream, val starting: Boolean, val deadline: Long)
+    private enum class MicState { IDLE, STARTING, ACTIVE, STOPPING, FAILED }
+
+    private var allowed = emptySet<Stream>()
+    private val active = mutableSetOf<Stream>()
+    private val stopping = linkedSetOf<Stream>()
+    private var pending: Pending? = null
+    private var playbackFailed = false
+    private var micAllowed = false
+    private var micState = MicState.IDLE
+    private var micDeadline = 0L
+    private val micFrames = ArrayBlockingQueue<ByteArray>(8)
+
     @Synchronized
-    fun playMusic(pcm: ByteArray): Boolean {
-        if (!musicAllowed || pcm.isEmpty() || pcm.size % 4 != 0 || pcm.size > MAX_PCM_BYTES) return false
-        expireRequest()
-        when (state) {
-            State.IDLE -> {
-                state = State.STARTING
-                deadline = nowMs() + ACK_TIMEOUT_MS
-                if (!send(START, MUSIC_START)) {
-                    // The P2C stream may not be connected yet. Do not enqueue sound.
-                    state = State.IDLE
-                }
-                return false
-            }
-            State.PLAYING -> {
-                if (send(MUSIC, pcm)) return true
-                // Backpressure or disconnect: stop using the remote channel and
-                // fall back instead of growing an unbounded audio backlog.
-                stopPlayback()
-                log("Carbit audio: remote send unavailable; using local output")
-                return false
-            }
-            else -> return false
+    fun updateCapabilities(streams: Set<Stream>) {
+        allowed = streams.toSet()
+        (active + listOfNotNull(pending?.takeIf { it.starting }?.stream))
+            .filter { it !in allowed }.forEach { stopStream(it) }
+        log("Carbit audio: enabled=$allowed")
+    }
+
+    @Synchronized
+    fun updateMusicAllowed(enabled: Boolean) =
+        updateCapabilities(if (enabled) allowed + Stream.MUSIC else allowed - Stream.MUSIC)
+
+    @Synchronized
+    fun updateMicAllowed(enabled: Boolean) {
+        micAllowed = enabled
+        if (!enabled) stopMic()
+        log("Carbit audio: supportMic=$enabled")
+    }
+
+    @Synchronized
+    fun startStream(stream: Stream) {
+        expireRequests()
+        if (playbackFailed || stream !in allowed || stream in active || stream in stopping ||
+            pending != null || micState == MicState.STARTING || micState == MicState.STOPPING) return
+        pending = Pending(stream, true, nowMs() + ACK_TIMEOUT_MS)
+        if (!send(START, stream.startBody())) pending = null
+    }
+
+    @Synchronized
+    fun play(stream: Stream, pcm: ByteArray): Boolean {
+        if (stream !in allowed || pcm.isEmpty() || pcm.size > MAX_PCM_BYTES ||
+            pcm.size % (stream.channels * 2) != 0) return false
+        expireRequests()
+        if (playbackFailed || stream in stopping) return false
+        if (stream !in active) {
+            startStream(stream)
+            return false
         }
+        if (send(stream.command, pcm)) return true
+        stopStream(stream)
+        log("Carbit audio: $stream congestion/disconnect, local fallback")
+        return false
     }
+
+    fun playMusic(pcm: ByteArray) = play(Stream.MUSIC, pcm)
 
     @Synchronized
     fun onReply(command: Int) {
-        expireRequest()
-        when {
-            command == START_ACK && state == State.STARTING -> {
-                state = State.PLAYING
-                log("Carbit audio: music start acknowledged")
+        expireRequests()
+        when (command) {
+            START_ACK, STOP_ACK -> {
+                val request = pending ?: return
+                if (command != if (request.starting) START_ACK else STOP_ACK) return
+                pending = null
+                if (request.starting) {
+                    active.add(request.stream)
+                    log("Carbit audio: ${request.stream} start acknowledged")
+                } else {
+                    active.remove(request.stream)
+                    stopping.remove(request.stream)
+                }
+                pumpStops()
             }
-            command == STOP_ACK && state == State.STOPPING -> state = State.IDLE
+            MIC_START_ACK -> if (micState == MicState.STARTING) {
+                micState = MicState.ACTIVE
+                log("Carbit audio: microphone start acknowledged")
+                pumpStops()
+            }
+            MIC_STOP_ACK -> if (micState == MicState.STOPPING) {
+                micState = MicState.IDLE
+                pumpStops()
+            }
         }
+    }
+
+    @Synchronized
+    fun stopStream(stream: Stream) {
+        expireRequests()
+        if (stream !in active && pending?.stream != stream) return
+        stopping.add(stream)
+        pumpStops()
     }
 
     @Synchronized
     fun stopPlayback() {
-        if (state != State.PLAYING && state != State.STARTING) return
-        val wasStarting = state == State.STARTING
-        state = State.STOPPING
-        deadline = nowMs() + ACK_TIMEOUT_MS
-        val sent = send(STOP, MUSIC_STOP)
-        // Start ACK has no stream token. Never reuse a timed-out/cancelled
-        // start on the same connection, where a late ACK could be ambiguous.
-        if (!sent || wasStarting) state = State.FAILED
+        expireRequests()
+        stopping.addAll(active)
+        pending?.takeIf { it.starting }?.let { stopping.add(it.stream) }
+        pumpStops()
+    }
+
+    private fun pumpStops() {
+        if (playbackFailed || pending != null ||
+            micState == MicState.STARTING || micState == MicState.STOPPING) return
+        val stream = stopping.firstOrNull { it in active } ?: return
+        pending = Pending(stream, false, nowMs() + ACK_TIMEOUT_MS)
+        if (!send(STOP, stream.stopBody())) failPlayback()
+    }
+
+    @Synchronized
+    fun requestMic(): Boolean {
+        expireRequests()
+        if (!micAllowed || micState != MicState.IDLE || pending != null) return false
+        micFrames.clear()
+        micState = MicState.STARTING
+        micDeadline = nowMs() + ACK_TIMEOUT_MS
+        if (!send(MIC_START, MIC_START_BODY)) {
+            micState = MicState.IDLE
+            return false
+        }
+        return true
+    }
+
+    /** Called only after C2P has sent the required acknowledgment. Never logs raw PCM. */
+    @Synchronized
+    fun onMicData(pcm: ByteArray) {
+        expireRequests()
+        if (micState != MicState.ACTIVE || pcm.isEmpty() || pcm.size > MAX_PCM_BYTES || pcm.size % 2 != 0) return
+        if (!micFrames.offer(pcm.copyOf())) {
+            micFrames.poll()
+            micFrames.offer(pcm.copyOf())
+        }
+    }
+
+    fun pollMic(timeoutMs: Long): ByteArray? {
+        val pcm = micFrames.poll(timeoutMs, TimeUnit.MILLISECONDS)
+        return synchronized(this) {
+            expireRequests()
+            pcm?.takeIf { micState == MicState.ACTIVE }
+        }
+    }
+
+    @Synchronized
+    fun stopMic() {
+        micFrames.clear()
+        if (micState != MicState.STARTING && micState != MicState.ACTIVE) return
+        val starting = micState == MicState.STARTING
+        micState = MicState.STOPPING
+        micDeadline = nowMs() + ACK_TIMEOUT_MS
+        if (!send(MIC_STOP, ByteArray(0)) || starting) {
+            // Late start replies are ambiguous after a cancelled request.
+            micState = MicState.FAILED
+            pumpStops()
+        }
     }
 
     @Synchronized
     fun reset() {
-        state = State.IDLE
-        musicAllowed = false
-        deadline = 0L
+        allowed = emptySet()
+        active.clear()
+        stopping.clear()
+        pending = null
+        playbackFailed = false
+        micAllowed = false
+        micState = MicState.IDLE
+        micFrames.clear()
     }
 
-    private fun expireRequest() {
-        if ((state == State.STARTING || state == State.STOPPING) && nowMs() >= deadline) {
-            if (state == State.STARTING) send(STOP, MUSIC_STOP)
-            state = State.FAILED
-            log("Carbit audio: acknowledgment timed out; using local output until reconnect")
+    private fun expireRequests() {
+        val request = pending
+        if (request != null && nowMs() >= request.deadline) {
+            if (request.starting) active.add(request.stream)
+            failPlayback()
         }
+        if ((micState == MicState.STARTING || micState == MicState.STOPPING) && nowMs() >= micDeadline) {
+            if (micState == MicState.STARTING) send(MIC_STOP, ByteArray(0))
+            micState = MicState.FAILED
+            micFrames.clear()
+            log("Carbit audio: mic acknowledgment timeout; use local input")
+            pumpStops()
+        }
+    }
+
+    private fun failPlayback() {
+        // Never reuse an uncorrelated acknowledgment after timeout.
+        playbackFailed = true
+        pending = null
+        active.forEach { send(STOP, it.stopBody()) }
+        active.clear()
+        stopping.clear()
+        log("Carbit audio: playback control failed; use local output until reconnect")
     }
 
     companion object {
@@ -100,9 +226,14 @@ internal class CarbitAudioTransport(
         const val STOP = 0x000200D0
         const val STOP_ACK = 0x000200D1
         const val MUSIC = 0x60000030
+        const val MIC_START = 0x000200F0
+        const val MIC_START_ACK = 0x000200F1
+        const val MIC_STOP = 0x00020100
+        const val MIC_STOP_ACK = 0x00020101
+        const val MIC_DATA = 0x00010060
+        const val MIC_DATA_ACK = 0x00010061
         private const val ACK_TIMEOUT_MS = 1000L
         private const val MAX_PCM_BYTES = 16 * 1024
-        private val MUSIC_START = """{"type":4,"sampleRate":48000,"channel":2,"format":3}""".toByteArray(Charsets.UTF_8)
-        private val MUSIC_STOP = """{"type":4}""".toByteArray(Charsets.UTF_8)
+        private val MIC_START_BODY = """{"sampleRate":16000,"channel":1,"format":3}""".toByteArray(Charsets.UTF_8)
     }
 }
