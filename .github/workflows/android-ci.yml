@@ -38,11 +38,57 @@ jobs:
         run: |
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-34" "build-tools;34.0.0"
 
+      - name: Verify Gradle Wrapper
+        run: echo "498495120a03b9a6ab5d155f5de3c8f0d986a449153702fb80fc80e134484f17  gradle/wrapper/gradle-wrapper.jar" | sha256sum -c -
+
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
       - name: Build debug APK and run unit tests
         run: ./gradlew assembleDebug testDebugUnitTest --no-daemon
+
+      - name: Export resolved dependency inventory
+        run: |
+          mkdir -p audit
+          ./gradlew -I ci/dependency-audit.init.gradle securityDependencyInventory --no-daemon
+
+      - name: Audit dependencies against OSV
+        run: python3 ci/osv-audit.py
+
+      - name: Antivirus scan of APK and extracted contents
+        if: success() || failure()
+        run: |
+          set -euo pipefail
+          mkdir -p audit
+          test -f app/build/outputs/apk/debug/app-debug.apk
+          sudo apt-get update
+          sudo apt-get install -y clamav
+          sudo systemctl stop clamav-freshclam || true
+          sudo freshclam --stdout
+          scan_dir="$(mktemp -d)"
+          unzip -q app/build/outputs/apk/debug/app-debug.apk -d "$scan_dir"
+          clamscan --version | tee audit/clamav.txt
+          clamscan --recursive --infected --max-filesize=100M --max-scansize=400M app/build/outputs/apk/debug/app-debug.apk "$scan_dir" | tee -a audit/clamav.txt
+
+      - name: Verify APK signature and manifest
+        if: success() || failure()
+        run: |
+          set -euo pipefail
+          mkdir -p audit
+          tools="$ANDROID_HOME/build-tools/34.0.0"
+          apk="app/build/outputs/apk/debug/app-debug.apk"
+          "$tools/apksigner" verify --verbose --print-certs "$apk" | tee audit/apk-signature.txt
+          "$tools/aapt" dump permissions "$apk" | tee audit/apk-permissions.txt
+          if grep -q 'android.permission.REQUEST_INSTALL_PACKAGES' audit/apk-permissions.txt; then exit 1; fi
+
+      - name: Upload security reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: security-reports-${{ github.run_number }}
+          path: audit/
+          if-no-files-found: warn
+          retention-days: 30
 
       - name: Prepare APK and checksum
         run: |
