@@ -44,6 +44,11 @@
     <string name="pref_aa_carbit_mic_title">Микрофон автомобиля через CarbitLink (экспериментально)</string>
     <string name="pref_aa_carbit_mic_summary">Только в режиме звука CarbitLink. Использует микрофон автомобиля по запросу Android Auto, если он поддерживается, иначе микрофон телефона или Bluetooth.</string>
     <string name="pref_hu_emulator_title">Запустить сеанс эмулятора ГУ</string>
-    <string name="pref_hu_emulator_summary">Только debug: ожидание подключения через ADB (localhost), 2 минуты</string>
+    <string name="pref_hu_emulator_summary">Только debug: локальная Wi-Fi сеть или ADB</string>
     <string name="pref_hu_emulator_confirm">Сначала отключите автомобиль. Используйте доверенный компьютер с ADB; после теста остановите сеанс.</string>
+    <string name="pref_hu_emulator_lan">Локальная Wi-Fi сеть</string>
+    <string name="pref_hu_emulator_adb">ADB (localhost)</string>
+    <string name="pref_hu_emulator_no_wifi">Сначала подключите телефон к Wi-Fi.</string>
+    <string name="pref_hu_emulator_start">Запустить сеанс</string>
+    <string name="pref_hu_emulator_lan_details">IP: %1$s\nКод сеанса: %2$s\n\nВведите оба значения в HU Emulator. Отключите реальный автомобиль. Код действует только для этого сеанса; подключитесь в течение 2 минут. Звук и видео не шифруются: используйте только доверенную Wi-Fi сеть.</string>
 </resources>

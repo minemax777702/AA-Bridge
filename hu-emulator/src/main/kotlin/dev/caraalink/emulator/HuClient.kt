@@ -14,6 +14,7 @@ import kotlin.concurrent.thread
 internal class HuClient(
     private val context: Context,
     private val host: String,
+    private val lanKey: ByteArray?,
     private val config: Config,
     private val surface: Surface,
     private val log: (String) -> Unit,
@@ -93,6 +94,12 @@ internal class HuClient(
         try {
             socket.connect(InetSocketAddress(host, port), 5000)
             socket.tcpNoDelay = true
+            socket.soTimeout = 5000
+            if (lanKey != null) {
+                check(dev.caraalink.protocol.EmulatorLanAuth.connect(
+                    socket.getInputStream(), socket.getOutputStream(), lanKey, port
+                )) { "Invalid session code or server proof" }
+            }
             socket.soTimeout = 15000
             val link = Link(socket)
             links.add(link)

@@ -17,6 +17,7 @@ class MainActivity : Activity() {
     private lateinit var status: TextView
     private lateinit var connect: Button
     private lateinit var host: EditText
+    private lateinit var code: EditText
     private lateinit var resolution: Spinner
     private lateinit var music: CheckBox
     private lateinit var tts: CheckBox
@@ -35,8 +36,16 @@ class MainActivity : Activity() {
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         val layout = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(12, 8, 12, 8) }
         val controls = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        host = EditText(this).apply { hint = "IP телефона / ADB: 127.0.0.1"; setText("127.0.0.1"); isSingleLine = true }
+        host = EditText(this).apply { hint = "IP телефона (Wi-Fi) / ADB: 127.0.0.1"; isSingleLine = true }
         controls.addView(host)
+        code = EditText(this).apply {
+            hint = "Код сеанса (для Wi-Fi)"
+            isSingleLine = true
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
+            filters = arrayOf(android.text.InputFilter.LengthFilter(32))
+            importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO
+        }
+        controls.addView(code)
         resolution = Spinner(this).apply {
             adapter = ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item,
                 listOf("1280 × 720", "1920 × 720", "1920 × 1080"))
@@ -90,6 +99,12 @@ class MainActivity : Activity() {
     private fun startConnection() {
         val address = host.text.toString().trim()
         if (address.isEmpty() || !screen.holder.surface.isValid) return
+        val adb = address == "127.0.0.1"
+        val key = if (adb) null else dev.caraalink.protocol.EmulatorLanAuth.parseCode(code.text.toString())
+        if (!adb && (key == null || !address.matches(Regex("[0-9]{1,3}(\\\\.[0-9]{1,3}){3}")) || address.split('.').any { it.toInt() !in 0..255 })) {
+            status.text = "Введите IPv4-адрес телефона и 32-значный код сеанса."
+            return
+        }
         val (w,h) = when(resolution.selectedItemPosition) { 1 -> 1920 to 720; 2 -> 1920 to 1080; else -> 1280 to 720 }
         width = w; height = h; screen.requestLayout()
         val id = ++generation
@@ -97,14 +112,14 @@ class MainActivity : Activity() {
         setConfigEnabled(false)
         val options = HuClient.Config(w,h,music.isChecked,tts.isChecked,vr.isChecked,talkie.isChecked,mic.isChecked,
             if (delay.isChecked) 1500L else 0L,drop.isChecked)
-        client = HuClient(this,address,options,screen.holder.surface,
+        client = HuClient(this,address,key,options,screen.holder.surface,
             { line -> runOnUiThread { if (id == generation) status.text = (status.text.toString() + "\n" + line).lines().takeLast(5).joinToString("\n") } },
             { runOnUiThread { if (id == generation) resetUi() } }).also { it.start() }
         status.text = "Подключение к $address"
     }
 
     private fun setConfigEnabled(enabled: Boolean) {
-        listOf<View>(host,resolution,music,tts,vr,talkie,mic,drop,delay).forEach { it.isEnabled = enabled }
+        listOf<View>(host,code,resolution,music,tts,vr,talkie,mic,drop,delay).forEach { it.isEnabled = enabled }
     }
 
     private fun sendTouch(event: MotionEvent) {

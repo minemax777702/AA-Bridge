@@ -147,7 +147,7 @@ class UsbLinkForegroundService : Service() {
             ACTION_START_SESSION -> {
                 handleStart(intent) { accessory -> beginSession(accessory) }
             }
-            ACTION_START_EMULATOR -> if (dev.caraalink.BuildConfig.DEBUG) beginEmulator()
+            ACTION_START_EMULATOR -> if (dev.caraalink.BuildConfig.DEBUG) beginEmulator(intent)
             ACTION_START_WIRELESS -> {
                 val address = intent.getStringExtra(EXTRA_CAR_ADDRESS)
                 val target = address?.let { RememberedCar(intent.getStringExtra(EXTRA_CAR_NAME) ?: it, it) }
@@ -337,10 +337,21 @@ class UsbLinkForegroundService : Service() {
     private fun hasFineLocation() =
         checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED
 
-    /** Explicit foreground-only development entry point. No LAN or P2P listener is widened. */
-    private fun beginEmulator() {
+    /** Explicit debug session: ADB localhost or authenticated, Wi-Fi-bound LAN. */
+    private fun beginEmulator(intent: Intent) {
         if (!dev.caraalink.BuildConfig.DEBUG || session != null || wirelessLink != null ||
             pendingAccessory != null || sniffer != null || adbProbe != null) return
+        val requestedIp = intent.getStringExtra(EXTRA_EMULATOR_IP)
+        val lan = if (requestedIp != null) {
+            val endpoint = dev.caraalink.link.EmulatorWifi.current(this)
+            val key = intent.getStringExtra(EXTRA_EMULATOR_CODE)?.let(dev.caraalink.protocol.EmulatorLanAuth::parseCode)
+            if (endpoint == null || endpoint.address.hostAddress != requestedIp || key == null) {
+                // Reject stale or incomplete LAN configuration; do not widen the listener.
+                stopSelf()
+                return
+            }
+            dev.caraalink.link.EmulatorLanSession(endpoint, key)
+        } else null
         try {
             startForegroundWithMic()
         } catch (e: SecurityException) {
@@ -364,7 +375,7 @@ class UsbLinkForegroundService : Service() {
             it.copy(link = CarLink.NONE, wireless = WirelessPhase.IDLE,
                 phase = ConnectionPhase.DISCONNECTED, carName = null, lastError = null)
         }
-        s.startWireless(emulatorMode = true)
+        s.startWireless(emulatorMode = true, emulatorLan = lan)
         handler.postDelayed({
             if (session === s && ConnectionStateHolder.snapshot.phase != ConnectionPhase.STREAMING) {
                 phoneLog.log("HU emulator connection timeout")
@@ -713,6 +724,8 @@ class UsbLinkForegroundService : Service() {
             if (now < reconnectUntil) null else WirelessPhase.FAILED
 
         const val ACTION_START_EMULATOR = "dev.caraalink.service.action.START_EMULATOR"
+        const val EXTRA_EMULATOR_IP = "emulator_ip"
+        const val EXTRA_EMULATOR_CODE = "emulator_code"
         const val ACTION_START_WIRELESS = "dev.caraalink.service.action.START_WIRELESS"
         const val EXTRA_CAR_ADDRESS = "car_address"
         const val EXTRA_CAR_NAME = "car_name"

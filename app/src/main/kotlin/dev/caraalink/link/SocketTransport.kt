@@ -12,6 +12,8 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.concurrent.thread
 
+internal class EmulatorLanSession(val endpoint: EmulatorWifi.Endpoint, val key: ByteArray)
+
 /** What [CarSession] needs from a link to the car, USB or WiFi. */
 interface CarTransport {
     fun stop(reason: String = "stopped")
@@ -21,11 +23,12 @@ interface CarTransport {
  * Over Wi-Fi Direct the car connects to plain TCP ports on the phone, with the same framing as the ADB streams.
  * Callbacks run under one lock so the channels see the single-threaded order AdbTransport gives them.
  */
-class SocketTransport(
+class SocketTransport internal constructor(
     private val logger: DiagnosticLogger,
     private val handlerFor: (service: String) -> AdbTransport.StreamHandler?,
     private val onClosed: (reason: String) -> Unit,
     private val emulatorMode: Boolean = false,
+    private val emulatorLan: EmulatorLanSession? = null,
 ) : CarTransport {
 
     private val running = AtomicBoolean(false)
@@ -33,15 +36,24 @@ class SocketTransport(
     private val streams = CopyOnWriteArrayList<SocketStream>()
     private val nextId = AtomicInteger(1)
     private val dispatch = Any()
+    private val authenticating = CopyOnWriteArrayList<Socket>()
+    private val peerLock = Any()
+    private var emulatorPeer: java.net.InetAddress? = null
+    private val emulatorPorts = mutableMapOf<Int, Int>()
 
     fun start() {
         check(!emulatorMode || dev.caraalink.BuildConfig.DEBUG)
+        check(emulatorLan == null || emulatorMode)
         if (!running.compareAndSet(false, true)) return
         for (port in PORTS) {
             val server = try {
                 ServerSocket().apply {
                     reuseAddress = true
-                    bind(if (emulatorMode) InetSocketAddress("127.0.0.1", port) else InetSocketAddress(port))
+                    bind(when {
+                        emulatorLan != null -> InetSocketAddress(emulatorLan.endpoint.address, port)
+                        emulatorMode -> InetSocketAddress("127.0.0.1", port)
+                        else -> InetSocketAddress(port)
+                    })
                 }
             } catch (e: IOException) {
                 logger.log("listen on $port failed: ${e.message}")
@@ -63,6 +75,7 @@ class SocketTransport(
         listening = false
         logger.log("stopping: $reason")
         servers.forEach { runCatching { it.close() } }
+        authenticating.forEach { runCatching { it.close() } }
         streams.forEach { it.close() }
         onClosed(reason)
     }
@@ -71,14 +84,36 @@ class SocketTransport(
         while (running.get()) {
             val socket = try { server.accept() } catch (e: IOException) { break }
             val iface = runCatching { java.net.NetworkInterface.getByInetAddress(socket.localAddress)?.name }.getOrNull()
-            val allowed = if (emulatorMode) socket.inetAddress.isLoopbackAddress && socket.localAddress.isLoopbackAddress
-                else acceptsInterface(iface)
+            val allowed = when {
+                emulatorLan != null -> socket.localAddress == emulatorLan.endpoint.address &&
+                    emulatorLan.endpoint.contains(socket.inetAddress)
+                emulatorMode -> socket.inetAddress.isLoopbackAddress && socket.localAddress.isLoopbackAddress
+                else -> acceptsInterface(iface)
+            }
             if (!allowed) {
                 logger.log("refused tcp:$port from ${socket.remoteSocketAddress} on $iface")
                 runCatching { socket.close() }
                 continue
             }
             socket.tcpNoDelay = true
+            if (emulatorLan != null) {
+                authenticating.add(socket)
+                val authenticated = try {
+                    socket.soTimeout = 3000
+                    dev.caraalink.protocol.EmulatorLanAuth.accept(
+                        socket.getInputStream(), socket.getOutputStream(), emulatorLan.key, port
+                    ) { reserveEmulatorPort(socket.inetAddress, port) }
+                } catch (_: Exception) {
+                    false
+                } finally {
+                    authenticating.remove(socket)
+                }
+                if (!authenticated || !running.get()) {
+                    runCatching { socket.close() }
+                    continue
+                }
+                socket.soTimeout = 0
+            }
             val handler = handlerFor("tcp:$port")
             logger.log("car connected to tcp:$port from ${socket.remoteSocketAddress}")
             accepted++
@@ -93,6 +128,17 @@ class SocketTransport(
                 readLoop(stream, handler, port)
             }
         }
+    }
+
+    // Only the first authenticated peer can open this session's two PXC
+    // sockets and one control/video socket each. Reconnect requires a new code.
+    private fun reserveEmulatorPort(peer: java.net.InetAddress, port: Int): Boolean = synchronized(peerLock) {
+        if (!running.get() || (emulatorPeer != null && emulatorPeer != peer)) return@synchronized false
+        val count = emulatorPorts[port] ?: 0
+        if (count >= if (port == PXC_PORT) 2 else 1) return@synchronized false
+        emulatorPeer = peer
+        emulatorPorts[port] = count + 1
+        true
     }
 
     private fun readLoop(stream: SocketStream, handler: AdbTransport.StreamHandler, port: Int) {
@@ -115,7 +161,7 @@ class SocketTransport(
         stream.close()
         streams -= stream
         synchronized(dispatch) { handler.onClose(stream) }
-        if (port == PXC_PORT) stop(reason)
+        if (port == PXC_PORT || emulatorMode) stop(reason)
     }
 
     inner class SocketStream(override val localId: Int, val socket: Socket) : MirrorStream {

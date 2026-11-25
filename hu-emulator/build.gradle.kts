@@ -9,8 +9,8 @@ android {
         applicationId = "io.github.minemax777702.huemulator"
         minSdk = 29
         targetSdk = 34
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.2.0"
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -19,5 +19,6 @@ android {
 }
 
 dependencies {
+    implementation(project(":protocol"))
     testImplementation("junit:junit:4.13.2")
 }
