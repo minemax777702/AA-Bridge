@@ -45,6 +45,7 @@ class AppStateTest {
         assertTrue(shouldAutoConnect(idle, hasRememberedCar = true))
         assertTrue(shouldAutoConnect(idle.copy(wireless = WirelessPhase.NOT_FOUND), true))
         assertFalse(shouldAutoConnect(idle, hasRememberedCar = false))
+        assertFalse(shouldAutoConnect(idle.copy(emulatorActive = true), hasRememberedCar = true))
         assertFalse(shouldAutoConnect(idle.copy(link = CarLink.CABLE), true))
         assertFalse(shouldAutoConnect(idle.copy(link = CarLink.WIRELESS, wireless = WirelessPhase.SEARCHING), true))
         assertFalse(shouldAutoConnect(idle.copy(wireless = WirelessPhase.CONNECTING), true))

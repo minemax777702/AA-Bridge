@@ -94,7 +94,7 @@ class UsbLinkForegroundService : Service() {
         }
         if (it.phase == ConnectionPhase.STREAMING) {
             handler.post { transportReconnectAttempts = 0 }
-            AppSettings.setCarConnectedOnce(this)
+            if (!it.emulatorActive) AppSettings.setCarConnectedOnce(this)
         }
     }
 
@@ -170,6 +170,12 @@ class UsbLinkForegroundService : Service() {
             return
         }
         Log.i(TAG, "handleStart: ${intent.action} with accessory=${accessory.manufacturer}/${accessory.model}")
+        if (ConnectionStateHolder.snapshot.emulatorActive) {
+            val old = session
+            session = null
+            old?.stop()
+            ConnectionStateHolder.update { it.copy(emulatorActive = false) }
+        }
         pendingAccessory = accessory
         // The cable wins: drop any wireless search before the cable session starts.
         closeWireless(disconnect = true)
@@ -372,7 +378,7 @@ class UsbLinkForegroundService : Service() {
         }
         session = s
         ConnectionStateHolder.update {
-            it.copy(link = CarLink.NONE, wireless = WirelessPhase.IDLE,
+            it.copy(link = CarLink.NONE, wireless = WirelessPhase.IDLE, emulatorActive = true,
                 phase = ConnectionPhase.DISCONNECTED, carName = null, lastError = null)
         }
         s.startWireless(emulatorMode = true, emulatorLan = lan)
@@ -387,6 +393,7 @@ class UsbLinkForegroundService : Service() {
     // --- wireless ---
 
     private fun beginWireless(target: RememberedCar?) {
+        if (ConnectionStateHolder.snapshot.emulatorActive) return
         // startForegroundService needs startForeground even when there turns out to be nothing to do.
         startForegroundWithMic(wireless = true)
         if (target == null || ConnectionStateHolder.snapshot.link == CarLink.CABLE) {
@@ -621,7 +628,9 @@ class UsbLinkForegroundService : Service() {
         // Searching phases end with the service; NOT_FOUND, FAILED and WIFI_OFF stay for Home.
         ConnectionStateHolder.update {
             val active = it.wireless == WirelessPhase.SEARCHING || it.wireless == WirelessPhase.CONNECTING || it.wireless == WirelessPhase.RECONNECTING
-            it.copy(link = CarLink.NONE, wireless = if (active) WirelessPhase.IDLE else it.wireless)
+            it.copy(link = CarLink.NONE, wireless = if (active) WirelessPhase.IDLE else it.wireless,
+                emulatorActive = false, phase = if (it.emulatorActive) ConnectionPhase.DISCONNECTED else it.phase,
+                carName = if (it.emulatorActive) null else it.carName)
         }
         sniffer?.stop()
         adbProbe?.stop()

@@ -51,4 +51,8 @@
     <string name="pref_hu_emulator_no_wifi">Connect the phone to Wi-Fi first.</string>
     <string name="pref_hu_emulator_start">Start session</string>
     <string name="pref_hu_emulator_lan_details">IP: %1$s\nSession code: %2$s\n\nEnter both in HU Emulator. Disconnect any real car first. The code is valid for this session; connection must start within 2 minutes. Audio/video are not encrypted; use only a trusted Wi-Fi network.</string>
+    <string name="setup_emulator_continue">Continue without a car (debug)</string>
+    <string name="pref_hu_emulator_already_running">Emulator session already running. Stop it to generate a new code.</string>
+    <string name="pref_hu_emulator_disconnect_car">Disconnect the real car or stop the wireless search first.</string>
+    <string name="pref_hu_emulator_waiting">Waiting for HU Emulator…</string>
 </resources>

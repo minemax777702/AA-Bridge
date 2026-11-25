@@ -58,19 +58,7 @@ class SettingsActivity : AppCompatActivity() {
             findPreference<Preference>("start_hu_emulator")?.apply {
                 isVisible = dev.caraalink.BuildConfig.DEBUG
                 setOnPreferenceClickListener {
-                    val context = requireContext()
-                    if (dev.caraalink.BuildConfig.DEBUG) {
-                        android.app.AlertDialog.Builder(context)
-                            .setTitle(R.string.pref_hu_emulator_title)
-                            .setItems(arrayOf(getString(R.string.pref_hu_emulator_lan), getString(R.string.pref_hu_emulator_adb))) { _, index ->
-                                if (index == 0) showLanEmulatorDialog() else {
-                                    android.app.AlertDialog.Builder(context)
-                                        .setMessage(R.string.pref_hu_emulator_confirm)
-                                        .setPositiveButton(android.R.string.ok) { _, _ -> startEmulator() }
-                                        .setNegativeButton(android.R.string.cancel, null).show()
-                                }
-                            }.setNegativeButton(android.R.string.cancel, null).show()
-                    }
+                    HuEmulatorDialog.show(requireContext())
                     true
                 }
             }
@@ -83,44 +71,6 @@ class SettingsActivity : AppCompatActivity() {
                 showCarProfilesDialog()
                 true
             }
-        }
-
-        private fun showLanEmulatorDialog() {
-            val context = requireContext()
-            val endpoint = dev.caraalink.link.EmulatorWifi.current(context)
-            if (endpoint == null) {
-                Toast.makeText(context, R.string.pref_hu_emulator_no_wifi, Toast.LENGTH_LONG).show()
-                return
-            }
-            val ip = endpoint.address.hostAddress ?: return
-            val code = dev.caraalink.protocol.EmulatorLanAuth.newCode()
-            val message = getString(R.string.pref_hu_emulator_lan_details, ip, code)
-            val dialog = android.app.AlertDialog.Builder(context)
-                .setTitle(R.string.pref_hu_emulator_lan)
-                .setMessage(message)
-                .setPositiveButton(R.string.pref_hu_emulator_start, null)
-                .setNegativeButton(android.R.string.cancel, null)
-                .create()
-            dialog.setOnShowListener {
-                dialog.findViewById<android.widget.TextView>(android.R.id.message)?.setTextIsSelectable(true)
-                dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                    startEmulator(ip, code)
-                    it.isEnabled = false
-                    dialog.getButton(android.app.AlertDialog.BUTTON_NEGATIVE).text = getString(R.string.action_close)
-                }
-            }
-            dialog.show()
-        }
-
-        private fun startEmulator(ip: String? = null, code: String? = null) {
-            val context = requireContext()
-            val intent = Intent(context, dev.caraalink.service.UsbLinkForegroundService::class.java)
-                .setAction(dev.caraalink.service.UsbLinkForegroundService.ACTION_START_EMULATOR)
-            if (ip != null && code != null) {
-                intent.putExtra(dev.caraalink.service.UsbLinkForegroundService.EXTRA_EMULATOR_IP, ip)
-                intent.putExtra(dev.caraalink.service.UsbLinkForegroundService.EXTRA_EMULATOR_CODE, code)
-            }
-            context.startForegroundService(intent)
         }
 
         private fun showCarProfilesDialog() {

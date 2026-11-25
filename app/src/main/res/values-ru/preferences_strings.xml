@@ -51,4 +51,8 @@
     <string name="pref_hu_emulator_no_wifi">Сначала подключите телефон к Wi-Fi.</string>
     <string name="pref_hu_emulator_start">Запустить сеанс</string>
     <string name="pref_hu_emulator_lan_details">IP: %1$s\nКод сеанса: %2$s\n\nВведите оба значения в HU Emulator. Отключите реальный автомобиль. Код действует только для этого сеанса; подключитесь в течение 2 минут. Звук и видео не шифруются: используйте только доверенную Wi-Fi сеть.</string>
+    <string name="setup_emulator_continue">Продолжить без автомобиля (debug)</string>
+    <string name="pref_hu_emulator_already_running">Сеанс эмулятора уже запущен. Остановите его для получения нового кода.</string>
+    <string name="pref_hu_emulator_disconnect_car">Сначала отключите автомобиль или остановите поиск.</string>
+    <string name="pref_hu_emulator_waiting">Ожидание подключения эмулятора ГУ…</string>
 </resources>

@@ -80,7 +80,10 @@ private fun progress(context: Context, serverRunning: Boolean) = SetupProgress(
     permissionsGranted = permissionsGranted(context),
     devModeConfirmed = AppSettings.devModeConfirmed(context),
     serverRunning = serverRunning,
-    carConnectedOnce = AppSettings.carConnectedOnce(context),
+    carConnectedOnce = AppSettings.carConnectedOnce(context) ||
+        (dev.caraalink.BuildConfig.DEBUG && dev.caraalink.connection.ConnectionStateHolder.snapshot.let {
+            it.emulatorActive && it.phase == dev.caraalink.connection.ConnectionPhase.STREAMING
+        }),
 )
 
 @Composable
@@ -148,7 +151,25 @@ fun SetupScreen(onDone: () -> Unit, onOpenNearby: () -> Unit) {
                     }
                 }
                 StepCard(4, step, R.string.setup_car_title, R.string.setup_car_body) {
-                    TextButton(onClick = onOpenNearby) { Text(stringResource(R.string.home_connect_wireless)) }
+                    Column {
+                        TextButton(onClick = onOpenNearby) { Text(stringResource(R.string.home_connect_wireless)) }
+                        if (dev.caraalink.BuildConfig.DEBUG) {
+                            GlowButton(stringResource(R.string.pref_hu_emulator_title), {
+                                dev.caraalink.settings.HuEmulatorDialog.show(context)
+                            })
+                            TextButton(onClick = {
+                                // Explicit debug-only completion of setup without a physical car.
+                                // Do not falsify carConnectedOnce or skip the server/permission checks.
+                                AppSettings.setSetupComplete(context, true)
+                                onDone()
+                            }) { Text(stringResource(R.string.setup_emulator_continue)) }
+                        }
+                    }
+                }
+                if (dev.caraalink.BuildConfig.DEBUG) {
+                    TextButton(onClick = {
+                        context.startActivity(Intent(context, dev.caraalink.settings.SettingsActivity::class.java))
+                    }) { Text(stringResource(R.string.settings_advanced)) }
                 }
                 Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { SendLogsLink() }
                 Spacer(Modifier.height(24.dp))

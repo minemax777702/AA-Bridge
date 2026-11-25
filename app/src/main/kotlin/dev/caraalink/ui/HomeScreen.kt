@@ -231,6 +231,15 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenNearby: () -> Unit) {
 @Composable
 private fun HomeActions(state: HomeState, connection: ConnectionSnapshot, onOpenNearby: () -> Unit) {
     val context = LocalContext.current
+    if (dev.caraalink.BuildConfig.DEBUG && connection.emulatorActive) {
+        if (state == HomeState.NEEDS_TAP) {
+            AmberButton(stringResource(R.string.open_aa), { AndroidAutoServer.openSettings(context) })
+        } else if (!connection.phase.isCarConnected()) {
+            Text(stringResource(R.string.pref_hu_emulator_waiting), color = Dash.Muted)
+        }
+        DashLink(stringResource(R.string.home_disconnect)) { stopLink(context) }
+        return
+    }
     when (state) {
         HomeState.READY -> GlowButton(stringResource(R.string.home_connect_wireless), onOpenNearby)
         HomeState.SEARCHING, HomeState.CONNECTING -> DashLink(stringResource(R.string.home_use_another_car), onOpenNearby)
@@ -246,6 +255,9 @@ private fun HomeActions(state: HomeState, connection: ConnectionSnapshot, onOpen
             Spacer(Modifier.height(4.dp))
             DashLink(stringResource(R.string.home_try_again)) { retryWireless(context, connection) }
         }
+    }
+    if (dev.caraalink.BuildConfig.DEBUG && state == HomeState.READY && connection.link == CarLink.NONE) {
+        DashLink(stringResource(R.string.pref_hu_emulator_title)) { dev.caraalink.settings.HuEmulatorDialog.show(context) }
     }
 }
 
