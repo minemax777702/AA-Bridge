@@ -110,6 +110,17 @@ class MirrorControlChannelTest {
         assertEquals(MirrorControlChannel.RLY_UN_SUPPORT, msgType(reply))
     }
 
+    @Test
+    fun `SCREEN_EVENT preserves both finger slots and cancels on close`() {
+        channel.onData(stream, req(MirrorControlChannel.REQ_SCREEN_EVENT, screenEvent(2, 100, 200, slot = 0)))
+        channel.onData(stream, req(MirrorControlChannel.REQ_SCREEN_EVENT, screenEvent(2, 300, 200, slot = 1)))
+        channel.onData(stream, req(MirrorControlChannel.REQ_SCREEN_EVENT, screenEvent(3, 350, 200, slot = 1)))
+        channel.onData(stream, req(MirrorControlChannel.REQ_SCREEN_EVENT, screenEvent(1, 350, 200, slot = 1)))
+        assertEquals(listOf(0, 1, 1, 1), host.touchSlots)
+        channel.onClose(stream)
+        assertEquals(1, host.touchCancels)
+    }
+
     // -- helpers mirroring the private `req`/wire layout in MirrorChannels.kt --
 
     private fun req(type: Int, body: ByteArray): ByteArray =
@@ -119,9 +130,9 @@ class MirrorControlChannelTest {
     private fun msgType(frame: ByteArray): Int =
         ByteBuffer.wrap(frame, 0, 2).order(ByteOrder.LITTLE_ENDIAN).short.toInt() and 0xFFFF
 
-    private fun screenEvent(evType: Int, x: Int, y: Int, key: Int = 0): ByteArray =
+    private fun screenEvent(evType: Int, x: Int, y: Int, key: Int = 0, slot: Int = 0): ByteArray =
         ByteBuffer.allocate(10).order(ByteOrder.LITTLE_ENDIAN)
             .putShort(evType.toShort()).putShort(x.toShort()).putShort(y.toShort())
-            .putShort(0) // slot
+            .putShort(slot.toShort())
             .putShort(key.toShort()).array()
 }

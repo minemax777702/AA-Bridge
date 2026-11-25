@@ -86,13 +86,14 @@ class AaCarPresentation(
         var lastMoveAt = 0L
         texture.setOnTouchListener { v, ev ->
             val action = when (ev.actionMasked) {
-                MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> 0
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> 1
+                MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN,
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP,
+                MotionEvent.ACTION_CANCEL -> ev.actionMasked
                 MotionEvent.ACTION_MOVE -> {
                     val now = android.os.SystemClock.uptimeMillis()
                     if (now - lastMoveAt < 30) return@setOnTouchListener true
                     lastMoveAt = now
-                    2
+                    MotionEvent.ACTION_MOVE
                 }
                 else -> return@setOnTouchListener true
             }
@@ -123,7 +124,7 @@ class AaCarPresentation(
             // coords, view size, and the resulting video-pixel coords. Next
             // capture, compare the logged (x,y) for a tap on a known AA
             // button against that button's real on-screen position.
-            if (action == 0) {
+            if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) {
                 touchLogger.log("DOWN rawX=${ev.getX(0)} rawY=${ev.getY(0)} viewW=${v.width} viewH=${v.height} " +
                     "videoW=$videoWidth videoH=$videoHeight widthMargin=$widthMargin heightMargin=$heightMargin " +
                     "-> mappedX=${pointers[0].first} mappedY=${pointers[0].second}")

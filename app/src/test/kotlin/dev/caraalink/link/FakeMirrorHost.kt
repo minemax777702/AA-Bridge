@@ -4,6 +4,8 @@ package dev.caraalink.link
 class FakeMirrorHost(private val startVideoResult: Boolean = true) : MirrorHost {
     val capturedConfigs = mutableListOf<CaptureConfig>()
     val touches = mutableListOf<Triple<Int, Int, Int>>()
+    val touchSlots = mutableListOf<Int>()
+    var touchCancels = 0
     val keys = mutableListOf<Int>()
     val opened = mutableListOf<MirrorStream>()
     val closed = mutableListOf<MirrorStream>()
@@ -22,6 +24,13 @@ class FakeMirrorHost(private val startVideoResult: Boolean = true) : MirrorHost 
     override fun onTouch(action: Int, x: Int, y: Int) {
         touches.add(Triple(action, x, y))
     }
+
+    override fun onTouch(action: Int, x: Int, y: Int, slot: Int) {
+        touchSlots.add(slot)
+        onTouch(action, x, y)
+    }
+
+    override fun onTouchCancel() { touchCancels++ }
 
     override fun onKey(key: Int) {
         keys.add(key)

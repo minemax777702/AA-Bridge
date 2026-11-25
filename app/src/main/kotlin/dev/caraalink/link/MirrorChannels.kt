@@ -73,6 +73,9 @@ interface MirrorHost {
     fun onCaptureConfig(config: CaptureConfig)
     fun onStartVideo(): Boolean
     fun onTouch(action: Int, x: Int, y: Int)
+    /** Per-contact events from CarbitLink; legacy transports use slot zero. */
+    fun onTouch(action: Int, x: Int, y: Int, slot: Int) = onTouch(action, x, y)
+    fun onTouchCancel() = Unit
     fun onKey(key: Int)
     fun onDataStreamOpen(stream: MirrorStream)
     fun onDataStreamClosed(stream: MirrorStream)
@@ -118,6 +121,7 @@ class MirrorControlChannel(
 
     override fun onClose(stream: MirrorStream) {
         framers.remove(stream.localId)
+        host.onTouchCancel()
     }
 
     override fun onData(stream: MirrorStream, data: ByteArray) {
@@ -154,12 +158,12 @@ class MirrorControlChannel(
                 val evType = bb.short.toInt()
                 val x = bb.short.toInt()
                 val y = bb.short.toInt()
-                bb.short // slot
+                val slot = bb.short.toInt() and 0xFFFF
                 val key = bb.short.toInt() and 0xFFFF
                 when (evType) {
-                    1 -> host.onTouch(MotionEvent.ACTION_UP, x, y)
-                    2 -> host.onTouch(MotionEvent.ACTION_DOWN, x, y)
-                    3 -> host.onTouch(MotionEvent.ACTION_MOVE, x, y)
+                    1 -> host.onTouch(MotionEvent.ACTION_UP, x, y, slot)
+                    2 -> host.onTouch(MotionEvent.ACTION_DOWN, x, y, slot)
+                    3 -> host.onTouch(MotionEvent.ACTION_MOVE, x, y, slot)
                     4 -> host.onKey(key)
                 }
             }

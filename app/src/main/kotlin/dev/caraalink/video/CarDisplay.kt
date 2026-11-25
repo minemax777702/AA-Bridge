@@ -9,6 +9,7 @@ import android.os.Looper
 import android.os.SystemClock
 import android.view.Display
 import dev.caraalink.diagnostics.DiagnosticLogger
+import android.view.InputDevice
 import android.view.MotionEvent
 import android.view.Surface
 import android.view.WindowManager
@@ -34,6 +35,7 @@ class CarDisplay(
     @Volatile var screen = CarScreen.STARTING
         private set
     private var touchDownAt = 0L
+    private val touchContacts = TouchContacts()
 
     /** Point the car display at a (new) encoder surface of [w]x[h]. */
     fun attach(surface: Surface, w: Int, h: Int) = main.post {
@@ -86,6 +88,7 @@ class CarDisplay(
 
     private fun showCurrent() {
         val display = carDisplay?.display ?: return
+        cancelTouchNow()
         presentation?.dismiss()
         presentation = try {
             when {
@@ -112,19 +115,52 @@ class CarDisplay(
     }
 
     /** Car touch in car-display pixels, delivered to whatever is on screen. */
-    fun touch(action: Int, x: Float, y: Float) = main.post {
-        val view = presentation?.window?.decorView ?: return@post
+    fun touch(action: Int, x: Float, y: Float, slot: Int = 0) = main.post {
+        if (presentation?.window?.decorView == null) return@post
+        touchContacts.update(action, slot, x, y)?.let(::dispatchTouch)
+    }
+
+    fun cancelTouch() = main.post { cancelTouchNow() }
+
+    private fun cancelTouchNow() {
+        touchContacts.cancel()?.let(::dispatchTouch)
+    }
+
+    private fun dispatchTouch(frame: TouchFrame) {
+        val view = presentation?.window?.decorView ?: return
         val now = SystemClock.uptimeMillis()
-        if (action == MotionEvent.ACTION_DOWN) touchDownAt = now
-        val ev = MotionEvent.obtain(touchDownAt, now, action, x, y, 0)
-        view.dispatchTouchEvent(ev)
-        ev.recycle()
+        if (frame.action == MotionEvent.ACTION_DOWN) touchDownAt = now
+        val properties = frame.contacts.map { contact ->
+            MotionEvent.PointerProperties().apply {
+                id = contact.id
+                toolType = MotionEvent.TOOL_TYPE_FINGER
+            }
+        }.toTypedArray()
+        val coordinates = frame.contacts.map { contact ->
+            MotionEvent.PointerCoords().apply {
+                x = contact.x
+                y = contact.y
+                pressure = 1f
+                size = 1f
+            }
+        }.toTypedArray()
+        val event = MotionEvent.obtain(
+            touchDownAt, now, frame.androidAction, frame.contacts.size,
+            properties, coordinates, 0, 0, 1f, 1f, 0, 0,
+            InputDevice.SOURCE_TOUCHSCREEN, 0,
+        )
+        try {
+            view.dispatchTouchEvent(event)
+        } finally {
+            event.recycle()
+        }
     }
 
     /** Draws the current screen again, so a still picture still gives the encoder a fresh frame. */
     fun redraw() = main.post { presentation?.window?.decorView?.invalidate() }
 
     fun release() = main.post {
+        cancelTouchNow()
         presentation?.dismiss()
         presentation = null
         carDisplay?.release()

@@ -438,13 +438,19 @@ class CarSession(
         return encoder != null
     }
 
-    override fun onTouch(action: Int, x: Int, y: Int) {
+    override fun onTouch(action: Int, x: Int, y: Int) = onTouch(action, x, y, 0)
+
+    override fun onTouch(action: Int, x: Int, y: Int, slot: Int) {
         val c = config ?: return
         val enc = encoder ?: return
         // Car coordinates are in its own screen size; the encoder may be a few pixels smaller.
         val fx = x * enc.width.toFloat() / c.width
         val fy = y * enc.height.toFloat() / c.height
-        display.touch(action, fx, fy)
+        display.touch(action, fx, fy, slot)
+    }
+
+    override fun onTouchCancel() {
+        display.cancelTouch()
     }
 
     override fun onKey(key: Int) {

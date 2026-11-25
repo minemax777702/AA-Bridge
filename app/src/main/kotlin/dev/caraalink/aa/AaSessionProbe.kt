@@ -239,8 +239,8 @@ class AaSessionProbe(
      * [pointers] lists every currently-down finger (x, y, pointerId) -- for
      * a single-finger tap/drag that's one entry; for pinch/rotate it's two.
      * [actionIndex] is which entry in [pointers] triggered this particular
-     * event (which finger went down/up/moved); [action] is a `PointerAction`:
-     * DOWN=0, UP=1, MOVED=2.
+     * event (which finger went down/up/moved); [action] is the masked Android
+     * MotionEvent action (including POINTER_DOWN=5 and POINTER_UP=6).
      */
     fun sendTouch(pointers: List<Triple<Int, Int, Int>>, actionIndex: Int, action: Int) {
         val channel = activeChannel ?: return
