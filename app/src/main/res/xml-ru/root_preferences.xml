@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.preference.PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <PreferenceCategory android:title="Видео">
+        <ListPreference
+            android:key="car_orientation"
+            android:title="Ориентация экрана автомобиля"
+            android:summary="Определяется автоматически по головному устройству; меняйте только при ошибке"
+            android:entries="@array/car_orientation_entries"
+            android:entryValues="@array/car_orientation_values"
+            android:defaultValue="auto" />
+        <ListPreference
+            android:key="video_resolution_mode"
+            android:title="Разрешение"
+            android:summary="Использовать разрешение головного устройства или задать размер вручную"
+            android:entries="@array/resolution_mode_entries"
+            android:entryValues="@array/resolution_mode_values"
+            android:defaultValue="auto" />
+        <EditTextPreference
+            android:key="video_resolution_custom_width"
+            android:title="Ширина вручную (пикс.)"
+            android:inputType="number" />
+        <EditTextPreference
+            android:key="video_resolution_custom_height"
+            android:title="Высота вручную (пикс.)"
+            android:inputType="number" />
+        <ListPreference
+            android:key="video_frame_rate"
+            android:title="Частота кадров"
+            android:entries="@array/frame_rate_entries"
+            android:entryValues="@array/frame_rate_values"
+            android:defaultValue="30" />
+        <EditTextPreference
+            android:key="video_bitrate_kbps"
+            android:title="Битрейт видео (кбит/с)"
+            android:inputType="number"
+            android:defaultValue="6000" />
+        <SwitchPreferenceCompat
+            android:key="video_dpi_auto"
+            android:title="Автоопределение DPI"
+            android:summary="Использовать плотность экрана телефона для сеанса Android Auto"
+            android:defaultValue="true" />
+        <EditTextPreference
+            android:key="video_dpi_manual"
+            android:title="DPI вручную"
+            android:summary="Используется только при отключённом автоопределении"
+            android:inputType="number"
+            android:defaultValue="160" />
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="Аудио">
+        <ListPreference
+            android:key="audio_sample_rate"
+            android:title="Частота дискретизации"
+            android:entries="@array/sample_rate_entries"
+            android:entryValues="@array/sample_rate_values"
+            android:defaultValue="48000" />
+        <SwitchPreferenceCompat
+            android:key="audio_stereo"
+            android:title="Стерео"
+            android:defaultValue="true" />
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="Android Auto">
+        <Preference
+            android:key="car_profiles"
+            android:title="Профили автомобилей"
+            android:summary="Сохранение и загрузка настроек видео и Android Auto для каждого автомобиля (ориентация, разрешение, заполнение и т. д.)" />
+        <SwitchPreferenceCompat
+            android:key="video_downscale_720p"
+            android:title="Снижение разрешения"
+            android:summary="Передавать Android Auto кадры 720p вместо 1080p: при том же адаптивном битрейте меньше пикселей и артефактов. Не зависит от настройки разрешения вручную."
+            android:defaultValue="true" />
+        <ListPreference
+            android:key="aa_fill_mode"
+            android:title="Заполнение экрана автомобиля"
+            android:summary="Android Auto не поддерживает разрешение с такими пропорциями экрана, поэтому необходимо выбрать один из этих режимов"
+            android:entries="@array/aa_fill_mode_entries"
+            android:entryValues="@array/aa_fill_mode_values"
+            android:defaultValue="fit" />
+        <ListPreference
+            android:key="aa_audio_route"
+            android:title="Микрофон и динамик Android Auto"
+            android:summary="Устройство для передачи и воспроизведения голосовых команд и медиа Android Auto"
+            android:entries="@array/aa_audio_route_entries"
+            android:entryValues="@array/aa_audio_route_values"
+            android:defaultValue="phone_direct" />
+        <SwitchPreferenceCompat
+            android:key="aa_auto_crop"
+            android:title="Автоматическая обрезка по форме экрана"
+            android:summary="Автоматически рассчитывать обрезку видео по фактическому размеру экрана автомобиля вместо обычных чёрных полос. Отключите, если изображение выглядит хуже."
+            android:defaultValue="true" />
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="Подключение">
+        <SwitchPreferenceCompat
+            android:key="auto_reconnect_usb"
+            android:title="Автоподключение"
+            android:summary="Автоматически восстанавливать USB-подключение при обрыве"
+            android:defaultValue="true" />
+        <ListPreference
+            android:key="usb_role_override"
+            android:title="Роль USB (отладка)"
+            android:summary="Подтверждено: телефон — USB-аксессуар, головное устройство — хост. Меняйте только для тестирования."
+            android:entries="@array/usb_role_entries"
+            android:entryValues="@array/usb_role_values"
+            android:defaultValue="auto" />
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="Обновления">
+        <SwitchPreferenceCompat
+            android:key="update_auto_check"
+            android:title="Проверять автоматически"
+            android:summary="Проверять при каждом запуске приложения; уведомлять только при наличии новой версии"
+            android:defaultValue="true" />
+        <Preference
+            android:key="check_for_updates_now"
+            android:title="Проверить обновления сейчас" />
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="Отладка">
+        <SwitchPreferenceCompat
+            android:key="debug_verbose_logging"
+            android:title="Перехват протокола"
+            android:summary="Записывать все управляющие сообщения CarbitLink/Android Auto с шестнадцатеричным представлением, включая видео и аудио. Большой объём данных; экспорт через инструменты разработчика."
+            android:defaultValue="false" />
+        <SwitchPreferenceCompat
+            android:key="debug_overlay"
+            android:title="Отладочная информация на экране"
+            android:summary="Показывать частоту кадров, битрейт и пропуски кадров при трансляции, в сеансе Android Auto и на экране приложения"
+            android:defaultValue="false" />
+        <SwitchPreferenceCompat
+            android:key="auto_save_crash_log"
+            android:title="Автосохранение журнала сбоев в папку «Загрузки»"
+            android:summary="При сбое автоматически сохранять текущий журнал в папку «Загрузки»"
+            android:defaultValue="true" />
+        <Preference
+            android:key="developer_tools"
+            android:title="Инструменты разработчика"
+            android:summary="Экспорт журналов, предпросмотр экрана автомобиля" />
+    </PreferenceCategory>
+
+</androidx.preference.PreferenceScreen>
