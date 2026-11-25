@@ -34,7 +34,7 @@ class CarSession(
     private val huToken = Any()
     private var gestureMode = dev.caraalink.settings.AppSettings.GestureMode.AUTO
     private val observedSlots = mutableSetOf<Int>()
-    private var primarySlot: Int? = null
+    private val singleTouch = HuGestureFilter()
     private var transport: CarTransport? = null
     private var config: CaptureConfig? = null
     private var lastBitRate: Int = -1
@@ -483,11 +483,7 @@ class CarSession(
             observedSlots.add(slot)
             if (observedSlots.size > 1) hu.multiTouch(huToken)
         } else if (action == android.view.MotionEvent.ACTION_UP) observedSlots.remove(slot)
-        if (gestureMode == dev.caraalink.settings.AppSettings.GestureMode.SINGLE) {
-            if (action == android.view.MotionEvent.ACTION_DOWN && primarySlot == null) primarySlot = slot
-            if (slot != primarySlot) return
-            if (action == android.view.MotionEvent.ACTION_UP) primarySlot = null
-        }
+        if (gestureMode == dev.caraalink.settings.AppSettings.GestureMode.SINGLE && !singleTouch.accepts(action, slot)) return
         val c = config ?: return
         val enc = encoder ?: return
         // Car coordinates are in its own screen size; the encoder may be a few pixels smaller.
@@ -498,7 +494,7 @@ class CarSession(
 
     @Synchronized override fun onTouchCancel() {
         observedSlots.clear()
-        primarySlot = null
+        singleTouch.reset()
         display.cancelTouch()
     }
 

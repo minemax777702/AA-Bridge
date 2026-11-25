@@ -61,6 +61,16 @@ internal object HuCompatibility {
             val path = (prefix + key).take(100)
             val value = json.opt(key)
             if (value is JSONObject) fields(value, "$path.", depth + 1, out)
+            else if (value is org.json.JSONArray) {
+                for (i in 0 until minOf(value.length(), 16)) {
+                    if (out.size >= 64) break
+                    val item = value.opt(i)
+                    if (item is JSONObject) fields(item, "$path[$i].", depth + 1, out)
+                    else if (vehicleName.containsMatchIn(path) && (item is Number || item is Boolean || item is String)) {
+                        out["$path[$i]"] = item.toString().replace(Regex("[\\r\\n\\t]"), " ").take(100)
+                    }
+                }
+            }
             else if (vehicleName.containsMatchIn(path) && (value is Number || value is Boolean || value is String)) {
                 out[path] = value.toString().replace(Regex("[\\r\\n\\t]"), " ").take(100)
             }
@@ -95,6 +105,7 @@ internal object HuCompatibility {
         }
         if (channel == "PXC" && ((cmd and 0xFF000000.toInt()) == 0x60000000 || cmd == 0x70000000 || cmd == 0x70000001)) return
         if (channel == "MIRROR" && (cmd == 0x20 || cmd == 0x40 || cmd == 0x72)) return
+        if (channel == "QD-HU" && body.size <= 8192 && dev.caraalink.link.QdBin.logicId(body)?.equals("heartbeat", ignoreCase = true) == true) return
         val json = if (body.size in 2..8192 && body.firstOrNull { it != 32.toByte() && it != 10.toByte() && it != 13.toByte() && it != 9.toByte() } == '{'.code.toByte())
             runCatching { JSONObject(String(body, Charsets.UTF_8)) }.getOrNull() else null
         if (channel == "QD-JSON" && json?.optString("CMD") == "CAR_INFO") {
@@ -118,7 +129,8 @@ internal object HuCompatibility {
         val now = SystemClock.elapsedRealtime()
         if (now - windowStart >= 60_000) { windowStart = now; written = 0 }
         if (written >= 240) return
-        val id = "$channel:0x${cmd.toString(16)}"
+        val logic = if (channel == "QD-HU" && body.size <= 8192) dev.caraalink.link.QdBin.logicId(body)?.take(64) else null
+        val id = "$channel:0x${cmd.toString(16)}" + if (logic != null && !privateName.containsMatchIn(logic)) " logic=$logic" else ""
         val fingerprint = body.size * 31 + body.take(256).hashCode()
         val previous = recent[id]
         if (previous != null && previous.first == fingerprint && now - previous.second < 5000) return

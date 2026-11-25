@@ -426,8 +426,8 @@ class QdTransport(
         val action = bb.getInt(28)
         val cmd = bb.getInt(68)
         val value = bb.getInt(72)
-        if (type == QdBin.TYPE_CMD && cmd != QdBin.CMD_HEARTBEAT || type == QdBin.TYPE_SCREEN) host.onHuMessage("QD-BIN", cmd, b)
-        if (type == QdBin.TYPE_HU && extra.isNotEmpty()) host.onHuMessage("QD-HU", cmd, extra)
+        if ((type == QdBin.TYPE_CMD && cmd != QdBin.CMD_HEARTBEAT) || type == QdBin.TYPE_SCREEN) host.onHuMessage("QD-BIN", cmd, b)
+        if (type == QdBin.TYPE_HU && action == 1 && extra.isNotEmpty()) host.onHuMessage("QD-HU", cmd, extra.copyOf(minOf(maxOf(bb.getInt(64), 0), extra.size, 8192)))
         when {
             type == QdBin.TYPE_CMD && action == 1 && cmd == QdBin.CMD_HEARTBEAT -> {
                 if (binHeartbeats++ < 2) logger.log("QD RX !BIN heartbeat value=$value")
