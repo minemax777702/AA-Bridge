@@ -2,10 +2,9 @@ package dev.caraalink.settings
 
 import dev.caraalink.wireless.RememberedCar
 import android.content.Context
-import androidx.preference.PreferenceManager
 
 /**
- * Typed reads over the preferences declared in res/xml/root_preferences.xml.
+ * Typed reads shared with the Compose settings screen.
  * These preferences are consumed by the active connection, video and audio paths.
  */
 object AppSettings {
@@ -15,8 +14,9 @@ object AppSettings {
     enum class CarOrientation { AUTO, LANDSCAPE, PORTRAIT }
     enum class AaFillMode { FIT, FILL }
 
-    private fun prefs(context: Context) =
-        PreferenceManager.getDefaultSharedPreferences(context)
+    // Same name as the former AndroidX default preference file; existing settings survive the UI migration.
+    internal fun prefs(context: Context) =
+        context.getSharedPreferences("${context.packageName}_preferences", Context.MODE_PRIVATE)
 
     fun setupComplete(context: Context): Boolean = prefs(context).getBoolean("setup_complete", false)
     fun setSetupComplete(context: Context, value: Boolean) = prefs(context).edit().putBoolean("setup_complete", value).apply()
