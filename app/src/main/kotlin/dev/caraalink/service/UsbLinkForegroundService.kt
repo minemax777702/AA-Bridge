@@ -695,7 +695,7 @@ class UsbLinkForegroundService : Service() {
         const val ACTION_START_SESSION = "dev.caraalink.service.action.START_SESSION"
         /** A session that just failed stops the service; a leftover ERROR seen by a later update must not. */
         internal fun shouldStopOnError(previous: ConnectionPhase?, snapshot: ConnectionSnapshot): Boolean =
-            snapshot.phase == ConnectionPhase.ERROR && previous != ConnectionPhase.ERROR && snapshot.link != CarLink.WIRELESS
+            snapshot.phase == ConnectionPhase.ERROR && previous != ConnectionPhase.ERROR && snapshot.link != CarLink.WIRELESS && !snapshot.emulatorActive
 
         /** Null keeps trying: inside the mid-drive window a failed attempt goes back to scanning. */
         internal fun afterFailedAttempt(reconnectUntil: Long, now: Long): WirelessPhase? =
