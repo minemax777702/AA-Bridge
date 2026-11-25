@@ -64,7 +64,6 @@
     <string name="nearby_permission_body">يحتاج AA Bridge إلى إذن الأجهزة القريبة للعثور على سيارتك.</string>
     <string name="settings_wireless_car">السيارة اللاسلكية</string>
     <string name="settings_forget">إزالة</string>
-    <string name="settings_updates">البحث عن تحديثات</string>
     <string name="settings_about">حول التطبيق</string>
     <string name="settings_advanced">إعدادات متقدمة</string>
     <string name="help_blank_q">شاشة السيارة لا تعرض شيئًا</string>
@@ -77,7 +76,6 @@
     <string name="made_by">من تطوير Ali Morgan</string>
     <string name="about_credit">مبني على CarAALink من تطوير JObersi10</string>
     <string name="about_license">مجاني ومفتوح المصدر، برخصة GPL-3.0</string>
-    <string name="about_source">الكود المصدري</string>
     <string name="fgs_channel">الاتصال بالسيارة</string>
     <string name="fgs_connecting">جارٍ الاتصال بسيارتك…</string>
     <string name="fgs_connected">متصل بسيارتك</string>
@@ -98,17 +96,4 @@
     <string name="tile_link">الاتصال</string>
     <string name="link_wireless_short">لاسلكي</string>
     <string name="link_cable_short">كابل</string>
-    <string name="support_if_helped">لو الابلكيشن ساعدك واستفدت بيه</string>
-    <string name="support_popup_body">أنا علي، اللي عامل AA Bridge، وهيفضل مجاني. تقدر تدعمه بتمن فنجان قهوة، مثلاً 50 أو 100 جنيه، أو بأي مبلغ يريحك. ومفيش أي إلزام، ودعوة حلوة منك تفرق معايا زيها زي أي مبلغ.</string>
-    <string name="support_action">ادعم AA Bridge</string>
-    <string name="support_not_now">مش دلوقتي</string>
-    <string name="support_already">دعمت قبل كده</string>
-    <string name="support_thanks">شكرًا إنك دعمت AA Bridge.</string>
-    <string name="support_banner">لو الابلكيشن ساعدك، ادعمه بتمن فنجان قهوة</string>
-    <string name="support_instapay">InstaPay (داخل مصر)</string>
-    <string name="support_paypal">PayPal (خارج مصر)</string>
-    <string name="support_not_in_egypt">مش في مصر؟</string>
-    <string name="support_in_egypt">في مصر؟</string>
-    <string name="car_support_line">ادعمه بتمن فنجان قهوة، مثلاً 50 أو 100 جنيه</string>
-    <string name="car_support_open_aa">افتح Android Auto</string>
 </resources>

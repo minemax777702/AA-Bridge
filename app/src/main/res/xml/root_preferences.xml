@@ -107,17 +107,6 @@
             android:defaultValue="auto" />
     </PreferenceCategory>
 
-    <PreferenceCategory android:title="@string/pref_category_updates_title">
-        <SwitchPreferenceCompat
-            android:key="update_auto_check"
-            android:title="@string/pref_update_auto_check_title"
-            android:summary="@string/pref_update_auto_check_summary"
-            android:defaultValue="true" />
-        <Preference
-            android:key="check_for_updates_now"
-            android:title="@string/pref_check_for_updates_now_title" />
-    </PreferenceCategory>
-
     <PreferenceCategory android:title="@string/pref_category_debug_title">
         <SwitchPreferenceCompat
             android:key="debug_verbose_logging"

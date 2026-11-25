@@ -10,6 +10,7 @@ import android.os.Looper
 import android.util.TypedValue
 import android.widget.LinearLayout
 import android.widget.TextView
+import dev.caraalink.connection.ConnectionPhase
 import dev.caraalink.connection.ConnectionSnapshot
 import dev.caraalink.connection.ConnectionStateHolder
 
@@ -66,7 +67,14 @@ class ConnectionDiagnosticsActivity : Activity() {
 
     private fun render(snapshot: ConnectionSnapshot) {
         statusView.text = buildString {
-            appendLine(getString(R.string.diag_phase, snapshot.phase.name))
+            appendLine(getString(R.string.diag_phase, getString(when (snapshot.phase) {
+                ConnectionPhase.DISCONNECTED -> R.string.diag_phase_disconnected
+                ConnectionPhase.ATTACHED -> R.string.diag_phase_attached
+                ConnectionPhase.SNIFFING -> R.string.diag_phase_sniffing
+                ConnectionPhase.STREAMING -> R.string.diag_phase_streaming
+                ConnectionPhase.RECONNECTING -> R.string.diag_phase_reconnecting
+                ConnectionPhase.ERROR -> R.string.diag_phase_error
+            })))
             appendLine(getString(R.string.diag_accessory, snapshot.accessoryManufacturer ?: "-", snapshot.accessoryModel ?: "-"))
             appendLine(getString(R.string.diag_read, snapshot.bytesRead))
             appendLine(getString(R.string.diag_written, snapshot.bytesWritten))

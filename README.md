@@ -2,7 +2,7 @@
   <img src="docs/logo.svg" alt="AA Bridge" width="480" />
 </p>
 
-AA Bridge brings Android Auto to cars whose screen only supports CarbitLink (also called EasyConnection) or QDLink phone mirroring.
+AndroidAuto Bridge is an independent fork of [AA-Bridge](https://github.com/alimorgaan/AA-Bridge). It brings Android Auto to cars whose screen only supports CarbitLink (also called EasyConnection) or QDLink phone mirroring.
 
 The app runs on your phone. It starts a local Android Auto session and sends it to the car, over a USB cable or wirelessly over Wi-Fi Direct. Touches on the car screen go back to Android Auto.
 
@@ -36,7 +36,7 @@ The app runs on your phone. It starts a local Android Auto session and sends it 
 
 ## Download
 
-Download [AA-Bridge.apk](https://github.com/alimorgaan/AA-Bridge/releases/latest/download/AA-Bridge.apk), the latest release. Android asks once to allow installs from your browser or chat app. The app checks for updates by itself.
+Build the APK locally or use the GitHub Actions build artifacts. The app has no built-in update checker, download client, donation prompts or external website links.
 
 ## Setup
 
@@ -80,7 +80,7 @@ Release builds are signed only when `keystore.properties` (storeFile, storePassw
 
 ## Credits
 
-Based on [CarAALink](https://github.com/JObersi10/CarAALink) by JObersi10. The Android Auto head unit certificate comes from aasdk, see [PROVENANCE.md](app/src/main/assets/aa/PROVENANCE.md).
+Based on [AA-Bridge](https://github.com/alimorgaan/AA-Bridge) by alimorgaan, itself based on [CarAALink](https://github.com/JObersi10/CarAALink) by JObersi10. The Android Auto head unit certificate comes from aasdk, see [PROVENANCE.md](app/src/main/assets/aa/PROVENANCE.md).
 
 ## License
 

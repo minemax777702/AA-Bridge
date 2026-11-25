@@ -64,10 +64,6 @@ class SettingsActivity : AppCompatActivity() {
                 showCarProfilesDialog()
                 true
             }
-            findPreference<Preference>("check_for_updates_now")?.setOnPreferenceClickListener {
-                dev.caraalink.update.UpdateChecker.checkNow(requireContext(), manual = true)
-                true
-            }
         }
 
         private fun showCarProfilesDialog() {

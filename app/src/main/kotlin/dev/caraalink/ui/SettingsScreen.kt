@@ -15,7 +15,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Info
-import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
@@ -55,7 +54,6 @@ import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.LayoutDirection
 import dev.caraalink.R
 import dev.caraalink.settings.SettingsActivity
-import dev.caraalink.update.UpdateChecker
 
 /** Page with a back arrow and a title; Settings, Help and About share it. */
 @Composable
@@ -73,17 +71,12 @@ fun SubScreen(title: String, onBack: () -> Unit, content: @Composable ColumnScop
 }
 
 @Composable
-fun SettingsScreen(onBack: () -> Unit, onHelp: () -> Unit, onAbout: () -> Unit, onSupport: () -> Unit) {
+fun SettingsScreen(onBack: () -> Unit, onHelp: () -> Unit, onAbout: () -> Unit) {
     val context = LocalContext.current
     SubScreen(stringResource(R.string.settings), onBack) {
         WirelessCarRow()
         DashGroup {
-            SettingsRow(rememberVectorPainter(Icons.Rounded.Refresh), stringResource(R.string.settings_updates)) {
-                UpdateChecker.checkNow(context, manual = true)
-            }
             SettingsRow(painterResource(R.drawable.ic_help), stringResource(R.string.help), onClick = onHelp)
-            SettingsRow(painterResource(R.drawable.ic_coffee), stringResource(R.string.support_action),
-                supporting = stringResource(R.string.support_if_helped), onClick = onSupport)
             SettingsRow(rememberVectorPainter(Icons.Rounded.Info), stringResource(R.string.settings_about), onClick = onAbout)
             SettingsRow(painterResource(R.drawable.ic_tune), stringResource(R.string.settings_advanced)) {
                 context.startActivity(Intent(context, SettingsActivity::class.java))
@@ -127,7 +120,7 @@ private fun DashGroup(content: @Composable ColumnScope.() -> Unit) {
 
 @Composable
 private fun SettingsRow(icon: Painter, label: String, supporting: String? = null, onClick: () -> Unit) {
-    // Each label reads in its own script's direction (the support row defaults to Arabic) but stays on the list's side.
+    // Each label reads in its own script's direction but stays on the list's side.
     val side = if (LocalLayoutDirection.current == LayoutDirection.Ltr) TextAlign.Left else TextAlign.Right
     val own = TextStyle(textDirection = TextDirection.Content, textAlign = side)
     ListItem(

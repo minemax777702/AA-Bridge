@@ -32,10 +32,6 @@
     <string name="pref_auto_reconnect_usb_summary">Автоматически восстанавливать USB-подключение при обрыве</string>
     <string name="pref_usb_role_override_title">Роль USB (отладка)</string>
     <string name="pref_usb_role_override_summary">Подтверждено: телефон — USB-аксессуар, головное устройство — хост. Меняйте только для тестирования.</string>
-    <string name="pref_category_updates_title">Обновления</string>
-    <string name="pref_update_auto_check_title">Проверять автоматически</string>
-    <string name="pref_update_auto_check_summary">Проверять при каждом запуске приложения; уведомлять только при наличии новой версии</string>
-    <string name="pref_check_for_updates_now_title">Проверить обновления сейчас</string>
     <string name="pref_category_debug_title">Отладка</string>
     <string name="pref_debug_verbose_logging_title">Перехват протокола</string>
     <string name="pref_debug_verbose_logging_summary">Записывать все управляющие сообщения CarbitLink/Android Auto с шестнадцатеричным представлением, включая видео и аудио. Большой объём данных; экспорт через инструменты разработчика.</string>
