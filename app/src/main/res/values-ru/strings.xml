@@ -111,4 +111,5 @@
     <string name="lan_debug_running">Сеанс отладки активен или ожидает подключения.</string>
     <string name="lan_debug_disconnect">Сначала отключите автомобиль.</string>
     <string name="lan_debug_no_wifi">Подключите телефон к Wi-Fi.</string>
+    <string name="lan_stationary_test_only">Только для неподвижного тестового стенда. Не используйте этот режим в движущемся автомобиле.</string>
 </resources>

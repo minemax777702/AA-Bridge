@@ -118,4 +118,5 @@
     <string name="lan_debug_running">Debug session active or waiting for connection.</string>
     <string name="lan_debug_disconnect">Disconnect the real car first.</string>
     <string name="lan_debug_no_wifi">Connect the phone to Wi-Fi first.</string>
+    <string name="lan_stationary_test_only">Stationary test bench only. Never use this mode in a moving vehicle.</string>
 </resources>

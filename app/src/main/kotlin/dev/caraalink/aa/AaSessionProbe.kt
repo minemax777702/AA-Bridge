@@ -63,6 +63,8 @@ class AaSessionProbe(
         val retryDelayMs: Long = 2_000,
         /** True only for the on-phone Car Preview session -- see AaServiceDiscovery.configFromSettings(). */
         val preview: Boolean = false,
+        /** Explicit stationary test bench only; never set for USB or ordinary Wi-Fi Direct. */
+        val lanTestBench: Boolean = false,
     )
 
     companion object {
@@ -74,6 +76,13 @@ class AaSessionProbe(
         var active: AaSessionProbe? = null
             private set
     }
+
+    internal val isLanTestBench: Boolean = dev.caraalink.BuildConfig.DEBUG && config.lanTestBench
+
+    private fun stationaryBenchActive(): Boolean = isLanTestBench &&
+        dev.caraalink.connection.ConnectionStateHolder.snapshot.let {
+            it.emulatorActive && it.link == dev.caraalink.connection.CarLink.NONE
+        }
 
     private val logger = DiagnosticLogger(context, "aa-session")
     private val running = AtomicBoolean(false)
@@ -844,6 +853,11 @@ class AaSessionProbe(
                         if (sensorType == SENSOR_NIGHT_MODE) {
                             nightSensorStarted = true
                             sendNightIfChanged()
+                        } else if (sensorType == AaServiceDiscovery.SENSOR_DRIVING_STATUS_DATA.toLong() && stationaryBenchActive()) {
+                            logger.log("TX SENSOR_EVENT stationary LAN test bench")
+                            channel.sendChannelSpecific(message.channelId, AaFraming.MSG_SENSOR_EVENT,
+                                AaProtobuf.Writer().message(AaServiceDiscovery.SENSOR_DRIVING_STATUS_DATA,
+                                    AaProtobuf.Writer().int(1, 0).build()).build())
                         }
                     }
                     continue

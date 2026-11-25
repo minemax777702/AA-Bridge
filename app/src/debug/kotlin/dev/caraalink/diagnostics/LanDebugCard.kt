@@ -41,6 +41,7 @@ internal fun LanDebugCard() {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(stringResource(R.string.lan_debug_title), style = MaterialTheme.typography.titleMedium)
             Text(stringResource(R.string.lan_debug_summary), color = Dash.Muted, style = MaterialTheme.typography.bodyMedium)
+            Text(stringResource(R.string.lan_stationary_test_only), color = Dash.Amber, style = MaterialTheme.typography.bodySmall)
             if (snapshot.emulatorActive || starting) {
                 if (ip != null && code != null) {
                     SelectionContainer {

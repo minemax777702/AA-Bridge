@@ -45,6 +45,7 @@ class CarSession(
     }
 
     @Volatile private var released = false
+    @Volatile private var lanTestBench = false
 
     private val frameLock = Any()
     @Volatile private var dataStream: MirrorStream? = null
@@ -80,6 +81,7 @@ class CarSession(
     /** The same channels over the car's Wi-Fi Direct TCP connections; the car shows up on its first CLIENT_INFO. */
     internal fun startWireless(emulatorMode: Boolean = false, emulatorLan: EmulatorLanSession? = null) {
         check(!emulatorMode || dev.caraalink.BuildConfig.DEBUG)
+        lanTestBench = emulatorMode && emulatorLan != null
         if (!emulatorMode) features.start()
         val socket = SocketTransport(logger, channels(), ::onTransportClosed, emulatorMode, emulatorLan)
         transport = socket
@@ -162,9 +164,14 @@ class CarSession(
 
     private fun openAndroidAuto() {
         if (released) return
-        if (dev.caraalink.aa.AaSessionProbe.active != null) {
-            showAaSurface()
-            return
+        val active = dev.caraalink.aa.AaSessionProbe.active
+        if (active != null) {
+            // Never hand a stationary simulated AA session to a physical car.
+            if (active.isLanTestBench != lanTestBench) active.stop()
+            else {
+                showAaSurface()
+                return
+            }
         }
         synchronized(this) {
             if (openingAa) {
@@ -195,7 +202,8 @@ class CarSession(
                 return@Thread
             }
             logger.log("openAndroidAuto: starting AA session probe")
-            val probe = dev.caraalink.aa.AaSessionProbe(context)
+            val probe = dev.caraalink.aa.AaSessionProbe(context,
+                dev.caraalink.aa.AaSessionProbe.Config(lanTestBench = lanTestBench))
             probe.attachCarbitAudio(pxc?.carbitAudio)
             probe.onEstablished = { AndroidAutoServer.cancelNeedsTap(context) }
             probe.onGaveUp = { main.post { onAaNotResponding() } }
@@ -365,6 +373,11 @@ class CarSession(
         // A restart dismisses the old presentation while staying in AA; only a real exit
         // (showStatus sets mode away from AA first) should stop the probe in onSurface(null).
         val myProbe = dev.caraalink.aa.AaSessionProbe.active
+        if (myProbe != null && myProbe.isLanTestBench != lanTestBench) {
+            myProbe.stop()
+            openAndroidAuto()
+            return
+        }
         myProbe?.attachCarbitAudio(pxc?.carbitAudio)
         display.showAa(
             videoWidth = config.resolution.width,
