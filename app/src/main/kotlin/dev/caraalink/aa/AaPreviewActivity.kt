@@ -75,13 +75,14 @@ class AaPreviewActivity : Activity() {
         var lastMoveAt = 0L
         surfaceView.setOnTouchListener { view, event ->
             val action = when (event.actionMasked) {
-                MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> 0
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> 1
+                MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN,
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP,
+                MotionEvent.ACTION_CANCEL -> event.actionMasked
                 MotionEvent.ACTION_MOVE -> {
                     val now = System.currentTimeMillis()
                     if (now - lastMoveAt < 30) return@setOnTouchListener true
                     lastMoveAt = now
-                    2
+                    MotionEvent.ACTION_MOVE
                 }
                 else -> return@setOnTouchListener false
             }
