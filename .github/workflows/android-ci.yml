@@ -126,3 +126,53 @@ jobs:
           path: dist/
           if-no-files-found: error
           retention-days: 30
+
+  # One-time publication for the explicitly requested v1.4.0 debug release.
+  # Never publish from pull requests or unrelated pushes.
+  publish_v1_4_0:
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && github.event.head_commit.message == 'Release AndroidAuto Bridge 1.4.0' }}
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Download and verify audited APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh run download "$GITHUB_RUN_ID" --name "AndroidAuto-Bridge-debug-$GITHUB_RUN_NUMBER" --dir dist
+          cd dist
+          sha256sum --check SHA256SUMS.txt
+      - name: Publish v1.4.0 pre-release
+        shell: bash
+        run: |
+          set -euo pipefail
+          existing="$(gh api "repos/$GH_REPO/git/matching-refs/tags/v1.4.0" --jq 'map(select(.ref == "refs/tags/v1.4.0")) | length')"
+          if [ "$existing" != "0" ]; then
+            echo "::error::Tag v1.4.0 already exists; refusing to move or overwrite it."
+            exit 1
+          fi
+          cat > release-notes.md <<'EOF'
+          ## AndroidAuto Bridge 1.4.0
+
+          - Русская локализация интерфейса, настроек, уведомлений и диагностики.
+          - Исправления безопасности: удалены встроенное обновление APK и интерфейс пожертвований.
+          - Обновлены Gradle, AGP, Kotlin и уязвимые транзитивные зависимости.
+          - Исправлено создание временных каталогов в модульных тестах.
+
+          Сборка прошла автоматические тесты, OSV-аудит, ClamAV и проверку подписи и разрешений.
+
+          **Предварительная debug-сборка.** APK подписан отладочным ключом CI; совместимость обновления с предыдущими APK не гарантируется. Проверка на реальном телефоне и головном устройстве остаётся необходимой.
+
+          SHA256: см. приложенный файл SHA256SUMS.txt.
+          EOF
+          gh release create v1.4.0 dist/AndroidAuto-Bridge-debug.apk dist/SHA256SUMS.txt \
+            --target "$GITHUB_SHA" \
+            --title "AndroidAuto Bridge 1.4.0" \
+            --notes-file release-notes.md \
+            --prerelease

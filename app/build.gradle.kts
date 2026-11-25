@@ -23,8 +23,8 @@ android {
         applicationId = "io.github.minemax777702.androidautobridge"
         minSdk = 29
         targetSdk = 34
-        versionCode = 7
-        versionName = "1.3.0"
+        versionCode = 8
+        versionName = "1.4.0"
         buildConfigField("String", "GIT_SHA", "\"${gitSha()}\"")
     }
 
