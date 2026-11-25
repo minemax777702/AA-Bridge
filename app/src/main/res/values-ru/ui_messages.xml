@@ -16,18 +16,11 @@
     <string name="pref_dpi_auto_summary">Масштабировать плотность под выбранное разрешение (текущее значение: %1$d)</string>
     <string name="pref_dpi_manual_summary">Используется только при отключённом автоопределении (текущее значение: %1$d)</string>
     <string name="dev_tools">Инструменты разработчика</string>
-    <string name="dev_export_log">Экспортировать последний журнал</string>
-    <string name="dev_save_log">Сохранить журнал в папку «Загрузки»</string>
     <string name="dev_clear_logs">Очистить журналы</string>
     <string name="dev_preview">Предпросмотр экрана автомобиля</string>
     <string name="dev_diagnostics">Диагностика подключения</string>
-    <string name="dev_no_logs">Журналов пока нет</string>
-    <string name="dev_share_logs">Поделиться журналами AndroidAuto Bridge</string>
     <string name="dev_logs_cleared">Журналы очищены</string>
-    <string name="dev_save_failed">Не удалось сохранить</string>
     <string name="dev_preview_desc">Предпросмотр запускает реальный сеанс Android Auto на телефоне или подключается к нему, отображает видео и поддерживает касания для тестирования без автомобиля.</string>
-    <string name="dev_saved_downloads">Файл %1$s сохранён в папку «Загрузки»</string>
-    <string name="dev_sharing">Отправка файла %1$s</string>
     <string name="diag_phase">Состояние: %1$s</string>
     <string name="diag_accessory">Аксессуар: %1$s / %2$s</string>
     <string name="diag_read">Получено байт: %1$d</string>
@@ -45,4 +38,5 @@
     <string name="diag_phase_streaming">Трансляция</string>
     <string name="diag_phase_reconnecting">Повторное подключение</string>
     <string name="diag_phase_error">Ошибка</string>
+    <string name="dev_clear_logs_confirm">Удалить локальные диагностические журналы? Это действие нельзя отменить.</string>
 </resources>

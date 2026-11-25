@@ -29,7 +29,7 @@
     <string name="home_wifi_off_body">Для подключения к автомобилю приложению AndroidAuto Bridge нужен Wi-Fi. Подключаться к сети необязательно.</string>
     <string name="home_wifi_settings">Настройки Wi-Fi</string>
     <string name="home_disconnect">Отключиться</string>
-    <string name="home_send_logs">Отправить журналы</string>
+    <string name="home_send_logs">Отправить диагностику</string>
     <string name="home_needs_tap_title">Запустите Android Auto</string>
     <string name="home_needs_tap_body">Откройте настройки Android Auto и запустите сервер головного устройства.</string>
     <string name="home_connected_title">Подключено</string>

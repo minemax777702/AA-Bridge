@@ -90,7 +90,7 @@ fun rememberServerRunning(): Boolean {
 }
 
 @Composable
-private fun rememberConnection(): ConnectionSnapshot {
+internal fun rememberConnection(): ConnectionSnapshot {
     var snapshot by remember { mutableStateOf(ConnectionStateHolder.snapshot) }
     DisposableEffect(Unit) {
         val main = Handler(Looper.getMainLooper())

@@ -34,7 +34,7 @@
     <string name="home_wifi_off_body">AA Bridge needs Wi-Fi on to reach your car. You don\'t have to join a network.</string>
     <string name="home_wifi_settings">Wi-Fi settings</string>
     <string name="home_disconnect">Disconnect</string>
-    <string name="home_send_logs">Send logs</string>
+    <string name="home_send_logs">Share diagnostics</string>
     <string name="home_needs_tap_title">Start Android Auto</string>
     <string name="home_needs_tap_body">Its server is off. One tap fixes it.</string>
     <string name="home_connected_title">Connected</string>
