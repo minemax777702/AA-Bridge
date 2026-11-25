@@ -131,7 +131,7 @@ class PxcChannel(
             return
         }
         if (cmd != HEARTBEAT && cmd != 0x10750 && cmd != 0x10430) {
-            logger.log("PXC C2P 0x${hex(cmd)} len=${body.size}" + preview(body))
+            logger.log("PXC C2P 0x${hex(cmd)} len=${body.size}" + if (cmd == CarbitAudioTransport.CAPABILITIES) preview(body) else "")
         }
         when {
             cmd == CLIENT_INFO -> {

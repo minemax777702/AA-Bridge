@@ -11,7 +11,9 @@ import java.io.Writer
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.ArrayBlockingQueue
+import java.util.concurrent.RejectedExecutionException
+import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 import java.util.zip.ZipEntry
@@ -32,14 +34,16 @@ class DiagnosticLogger(private val context: Context, private val tag: String) {
 
     /** Logs [bytes] as a classic hex+ASCII dump, [direction] e.g. "RX"/"TX". */
     fun logBytes(direction: String, bytes: ByteArray, length: Int) {
+        if (!dev.caraalink.BuildConfig.DEBUG) return
+        val shown = length.coerceIn(0, minOf(bytes.size, 256))
         val hex = StringBuilder()
         val ascii = StringBuilder()
-        for (i in 0 until length) {
+        for (i in 0 until shown) {
             val b = bytes[i]
             hex.append(String.format("%02X ", b))
             ascii.append(if (b in 0x20..0x7e) b.toInt().toChar() else '.')
         }
-        log("$direction ($length bytes): $hex | $ascii")
+        log("$direction ($length bytes, shown $shown): $hex | $ascii")
     }
 
     fun latestLogFile(): File = flushedCurrentFile(context)
@@ -64,10 +68,10 @@ class DiagnosticLogger(private val context: Context, private val tag: String) {
     fun shareAllLogsIntent(): Intent {
         latestLogFile()
         val dir = File(context.cacheDir, "reports").apply { mkdirs() }
-        dir.listFiles()?.forEach { it.delete() }
-        val zip = File(dir, "AABridge-logs-${SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date())}.zip")
+        dir.listFiles()?.filter { it.lastModified() < System.currentTimeMillis() - TimeUnit.DAYS.toMillis(1) }?.forEach { it.delete() }
+        val zip = File.createTempFile("AABridge-logs-", ".zip", dir)
         ZipOutputStream(zip.outputStream()).use { out ->
-            logDir(context).listFiles()?.sortedBy { it.name }?.forEach { f ->
+            logDir(context).listFiles()?.filter { it.isFile && it.extension == "log" }?.sortedBy { it.name }?.takeLast(MAX_LOG_FILES)?.forEach { f ->
                 out.putNextEntry(ZipEntry(f.name))
                 f.inputStream().use { it.copyTo(out) }
                 out.closeEntry()
@@ -98,18 +102,21 @@ class DiagnosticLogger(private val context: Context, private val tag: String) {
         }
         val uri = resolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, values) ?: return null
         return runCatching {
-            resolver.openOutputStream(uri)?.use { out -> file.inputStream().use { it.copyTo(out) } }
+            checkNotNull(resolver.openOutputStream(uri)).use { out -> file.inputStream().use { it.copyTo(out) } }
             name
-        }.getOrNull()
+        }.onFailure { runCatching { resolver.delete(uri, null, null) } }.getOrNull()
     }
 
     companion object {
         private const val MAX_BYTES_PER_FILE = 4L * 1024 * 1024 // 4 MiB, then roll over
+        private const val MAX_LOG_FILES = 5
+        private const val MAX_LINE_CHARS = 8192
+        private val dropped = AtomicLong(0)
         private val TIMESTAMP_FORMAT = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS", Locale.US)
 
         // One thread owns the file and callers only enqueue, so the AA receive loop
         // never waits on disk. The fields below are touched on that thread only.
-        private val writer = ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, LinkedBlockingQueue()) { r ->
+        private val writer = ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, ArrayBlockingQueue(2048)) { r ->
             Thread(r, "DiagnosticLogger").apply { isDaemon = true }
         }
 
@@ -125,20 +132,41 @@ class DiagnosticLogger(private val context: Context, private val tag: String) {
             val existing = currentFileRef
             if (existing != null && out != null && bytesWritten <= MAX_BYTES_PER_FILE) return existing
             out?.close()
-            val stamp = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date())
-            val file = File(logDir(context), "caraalink-$stamp.log")
+            val dir = logDir(context)
+            val stamp = SimpleDateFormat("yyyyMMdd-HHmmss-SSS", Locale.US).format(Date())
+            val file = File.createTempFile("caraalink-$stamp-", ".log", dir)
+            pruneLogs(dir, file, MAX_LOG_FILES)
             out = BufferedWriter(FileWriter(file, true))
             bytesWritten = file.length()
             return file.also { currentFileRef = it }
         }
 
-        private fun write(context: Context, timeMs: Long, line: String) = writer.execute {
-            runCatching {
-                currentFile(context)
-                val text = "${TIMESTAMP_FORMAT.format(Date(timeMs))}  $line\n"
-                out?.write(text)
-                bytesWritten += text.length
-                if (writer.queue.isEmpty()) out?.flush()
+        internal fun pruneLogs(dir: File, current: File, limit: Int) {
+            require(limit > 0)
+            dir.listFiles()?.filter { it.isFile && it.extension == "log" && it != current }
+                ?.sortedWith(compareByDescending<File> { it.lastModified() }.thenByDescending { it.name })
+                ?.drop(limit - 1)?.forEach { it.delete() }
+        }
+
+        private fun write(context: Context, timeMs: Long, line: String) {
+            // Bound both the queue and individual messages. Never block a protocol reader.
+            val safe = line.take(MAX_LINE_CHARS)
+            try {
+                writer.execute {
+                    runCatching {
+                        currentFile(context)
+                        val lost = dropped.getAndSet(0)
+                        val text = buildString {
+                            if (lost > 0) appendLine("[logger] Dropped $lost lines while busy")
+                            append(TIMESTAMP_FORMAT.format(Date(timeMs))).append("  ").appendLine(safe)
+                        }
+                        out?.write(text)
+                        bytesWritten += text.toByteArray(Charsets.UTF_8).size
+                        if (writer.queue.isEmpty()) out?.flush()
+                    }
+                }
+            } catch (_: RejectedExecutionException) {
+                dropped.incrementAndGet()
             }
         }
 
@@ -153,7 +181,9 @@ class DiagnosticLogger(private val context: Context, private val tag: String) {
                     runCatching { out?.close() }
                     out = null
                     currentFileRef = null
-                    logDir(context).listFiles()?.forEach { it.delete() }
+                    bytesWritten = 0
+                    dropped.set(0)
+                    logDir(context).listFiles()?.filter { it.extension == "log" }?.forEach { it.delete() }
                 }.get(2, TimeUnit.SECONDS)
             }
         }

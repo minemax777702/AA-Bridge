@@ -31,4 +31,20 @@ class DiagnosticLoggerTest {
             assertEquals((0 until 500).toList(), mine)
         }
     }
+
+    @Test
+    fun `rotation keeps current and most recent files`() {
+        val files = (1..8).map { index ->
+            tmp.newFile("log-$index.log").apply {
+                writeText("line")
+                setLastModified(index * 1000L)
+            }
+        }
+        val current = tmp.newFile("current.log")
+        val other = tmp.newFile("keep.txt")
+        DiagnosticLogger.pruneLogs(tmp.root, current, 5)
+        assertEquals(setOf("current.log", "log-5.log", "log-6.log", "log-7.log", "log-8.log"),
+            tmp.root.listFiles()!!.filter { it.extension == "log" }.map { it.name }.toSet())
+        assertEquals(true, other.exists())
+    }
 }
