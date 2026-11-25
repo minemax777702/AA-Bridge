@@ -34,14 +34,11 @@ class HuCompatibilityActivity : ComponentActivity() {
     }
 }
 
-private data class TestProfile(val title: Int, val route: String, val remoteMic: Boolean, val gestures: String, val auto: Boolean = false)
-private val profiles = listOf(
-    TestProfile(R.string.hu_profile_auto, "bt_preferred", false, "AUTO", true),
-    TestProfile(R.string.hu_profile_phone, "phone_direct", false, "MULTI"),
-    TestProfile(R.string.hu_profile_bt, "bt_preferred", false, "MULTI"),
-    TestProfile(R.string.hu_profile_pcm, "carbit_experimental", false, "MULTI"),
-    TestProfile(R.string.hu_profile_pcm_mic, "carbit_experimental", true, "MULTI"),
-    TestProfile(R.string.hu_profile_legacy, "device_only", false, "SINGLE"),
+private val routeLabels = mapOf(
+    "phone_direct" to R.string.hu_audio_phone_direct,
+    "bt_preferred" to R.string.hu_audio_bluetooth,
+    "device_only" to R.string.hu_audio_device,
+    "carbit_experimental" to R.string.hu_audio_pcm,
 )
 
 @Composable
@@ -53,6 +50,7 @@ private fun CompatibilityScreen(onBack: () -> Unit) {
     var mic by remember { mutableStateOf(prefs.getBoolean("aa_carbit_mic", false)) }
     var gestures by remember { mutableStateOf(prefs.getString(AppSettings.HU_GESTURES_KEY, "AUTO") ?: "AUTO") }
     var capture by remember { mutableStateOf(AppSettings.huCapture(context)) }
+    var expandedRoute by remember { mutableStateOf<String?>(if (auto) null else route) }
     val evidence by HuCompatibility.state.collectAsState()
     val scope = rememberCoroutineScope()
     var exporting by remember { mutableStateOf(false) }
@@ -69,22 +67,49 @@ private fun CompatibilityScreen(onBack: () -> Unit) {
             .putBoolean("aa_carbit_mic", mic).putString(AppSettings.HU_GESTURES_KEY, gestures).apply()
         DiagnosticLogger(context, "hu-compatibility").log("Profile selected: auto=$auto audio=$route remoteMic=$mic gestures=$gestures; reconnect HU")
     }
-    fun select(profile: TestProfile) {
+    fun select(profile: HuTestProfiles.Profile) {
         auto = profile.auto
         route = profile.route
         mic = profile.remoteMic
         gestures = profile.gestures
+        expandedRoute = if (profile.auto) null else profile.route
         applyProfile()
     }
     SubScreen(stringResource(R.string.hu_compat_title), onBack) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             CompatibilityTile(R.string.hu_profiles) {
                 Text(stringResource(R.string.hu_reconnect), color = Dash.Muted, style = MaterialTheme.typography.bodySmall)
-                profiles.forEach { profile ->
-                    val selected = if (auto) profile.auto else !profile.auto && route == profile.route && mic == profile.remoteMic && gestures == profile.gestures
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        RadioButton(selected = selected, onClick = { select(profile) })
-                        TextButton(onClick = { select(profile) }) { Text(stringResource(profile.title)) }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    RadioButton(selected = auto, onClick = { select(HuTestProfiles.automatic) })
+                    TextButton(onClick = { select(HuTestProfiles.automatic) }) { Text(stringResource(R.string.hu_profile_auto)) }
+                }
+                Text(stringResource(R.string.hu_profile_count, HuTestProfiles.manual.size), color = Dash.Muted,
+                    style = MaterialTheme.typography.bodySmall)
+                HuTestProfiles.routes.forEach { group ->
+                    HorizontalDivider(color = Dash.TileBorder)
+                    val expanded = expandedRoute == group
+                    val activeGroup = !auto && route == group
+                    TextButton(modifier = Modifier.fillMaxWidth(), onClick = { expandedRoute = if (expanded) null else group }) {
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text(stringResource(routeLabels.getValue(group)))
+                                if (activeGroup) Text(stringResource(R.string.hu_profile_combination,
+                                    stringResource(if (mic) R.string.hu_profile_mic_hu else R.string.hu_profile_mic_phone),
+                                    stringResource(if (gestures == "SINGLE") R.string.hu_gesture_single else R.string.hu_gesture_multi)),
+                                    style = MaterialTheme.typography.bodySmall, color = Dash.Muted)
+                            }
+                            Text(if (expanded) "−" else "+")
+                        }
+                    }
+                    if (expanded) HuTestProfiles.manual.filter { it.route == group }.forEach { profile ->
+                        val selected = profile.matches(auto, route, mic, gestures)
+                        val label = stringResource(R.string.hu_profile_combination,
+                            stringResource(if (profile.remoteMic) R.string.hu_profile_mic_hu else R.string.hu_profile_mic_phone),
+                            stringResource(if (profile.gestures == "SINGLE") R.string.hu_gesture_single else R.string.hu_gesture_multi))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            RadioButton(selected = selected, onClick = { select(profile) })
+                            TextButton(onClick = { select(profile) }) { Text(label) }
+                        }
                     }
                 }
             }

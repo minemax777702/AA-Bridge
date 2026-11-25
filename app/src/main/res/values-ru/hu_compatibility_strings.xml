@@ -48,4 +48,8 @@
     <string name="hu_check_music">Музыка</string>
     <string name="hu_check_guidance">Голосовые подсказки</string>
     <string name="hu_check_voice">Голосовой ввод</string>
+    <string name="hu_profile_count">%1$d ручных профилей по маршрутам звука</string>
+    <string name="hu_profile_combination">%1$s · %2$s</string>
+    <string name="hu_profile_mic_phone">Микрофон телефона</string>
+    <string name="hu_profile_mic_hu">Приоритет микрофона ГУ</string>
 </resources>
