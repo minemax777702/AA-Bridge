@@ -40,4 +40,14 @@ class WireTest {
     fun rejectsOversizeFrame() {
         Wire.readFrame(input(Wire.little(4).putInt(Int.MAX_VALUE).array()))
     }
+
+    @Test fun acceptsNormalIpv4AndRejectsInvalidHosts() {
+        assertTrue(Wire.isIpv4("192.168.1.100"))
+        assertTrue(Wire.isIpv4("10.0.0.2"))
+        assertFalse(Wire.isIpv4("192.168.1.256"))
+        assertFalse(Wire.isIpv4("192.168.1"))
+        assertFalse(Wire.isIpv4("192.168..1"))
+        assertFalse(Wire.isIpv4("localhost"))
+        assertFalse(Wire.isIpv4("192.168.1.+2"))
+    }
 }

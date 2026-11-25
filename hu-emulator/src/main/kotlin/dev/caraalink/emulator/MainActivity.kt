@@ -101,7 +101,7 @@ class MainActivity : Activity() {
         if (address.isEmpty() || !screen.holder.surface.isValid) return
         val adb = address == "127.0.0.1"
         val key = if (adb) null else dev.caraalink.protocol.EmulatorLanAuth.parseCode(code.text.toString())
-        if (!adb && (key == null || !address.matches(Regex("[0-9]{1,3}(\\\\.[0-9]{1,3}){3}")) || address.split('.').any { it.toInt() !in 0..255 })) {
+        if (!adb && (key == null || !Wire.isIpv4(address))) {
             status.text = "Введите IPv4-адрес телефона и 32-значный код сеанса."
             return
         }

@@ -282,6 +282,10 @@ class UsbLinkForegroundService : Service() {
         session?.stop()
         session = null
         ConnectionStateHolder.removeListener(stateListener)
+        if (ConnectionStateHolder.snapshot.emulatorActive) {
+            ConnectionStateHolder.update { it.copy(emulatorActive = false,
+                phase = ConnectionPhase.DISCONNECTED, carName = null) }
+        }
         detachStopRunnable?.let { handler.removeCallbacks(it) }
         detachStopRunnable = null
         runCatching { unregisterReceiver(detachReceiver) }

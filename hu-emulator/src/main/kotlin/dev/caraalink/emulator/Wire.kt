@@ -60,6 +60,14 @@ internal object Wire {
         return input.readExactly(length)
     }
 
+    fun isIpv4(address: String): Boolean {
+        val parts = address.split('.')
+        return parts.size == 4 && parts.all { part ->
+            part.length in 1..3 && part.all { it in '0'..'9' } &&
+                (part.toIntOrNull() ?: -1) in 0..255
+        }
+    }
+
     fun little(size: Int) = ByteBuffer.allocate(size).order(ByteOrder.LITTLE_ENDIAN)
     fun little(data: ByteArray) = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN)
     private fun DataInputStream.readExactly(size: Int) = ByteArray(size).also { readFully(it) }
