@@ -126,7 +126,7 @@ private fun stopLink(context: Context) {
 }
 
 @Composable
-fun HomeScreen(onOpenSettings: () -> Unit, onOpenNearby: () -> Unit, showSupportBanner: Boolean, onOpenSupport: () -> Unit) {
+fun HomeScreen(onOpenSettings: () -> Unit, onOpenNearby: () -> Unit) {
     val context = LocalContext.current
     val serverRunning = rememberServerRunning()
     val connection = rememberConnection()
@@ -149,7 +149,6 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenNearby: () -> Unit, showSupport
             .systemBarsPadding(),
     ) {
         DashTopBar(onOpenSettings)
-        if (showSupportBanner) SupportBanner(onOpenSupport, Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
         Column(
             Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,

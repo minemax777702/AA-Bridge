@@ -25,8 +25,6 @@ import dev.caraalink.ui.HomeScreen
 import dev.caraalink.ui.NearbyCarsScreen
 import dev.caraalink.ui.SettingsScreen
 import dev.caraalink.ui.SetupScreen
-import dev.caraalink.ui.SupportDialog
-import dev.caraalink.support.SupportAsk
 import dev.caraalink.ui.theme.AaBridgeTheme
 
 enum class Screen { SETUP, HOME, SETTINGS, HELP, ABOUT, NEARBY }
@@ -38,10 +36,6 @@ class MainActivity : ComponentActivity() {
         private const val TAG = "MainActivity"
     }
 
-    private var supportBanner by mutableStateOf(false)
-    private var supportPopup by mutableStateOf(false)
-    // Set where the intent arrives (onCreate/onNewIntent), read in onResume: onStart runs before onNewIntent.
-    private var carLaunchPending = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -54,10 +48,8 @@ class MainActivity : ComponentActivity() {
         dev.caraalink.diagnostics.CrashMarker.consumeLastCrash(this)?.let { summary ->
             Toast.makeText(this, "Restarted after a crash: $summary", Toast.LENGTH_LONG).show()
         }
-        dev.caraalink.update.UpdateChecker.checkIfDue(this)
         maybeAutoStartOnAttach(intent, recreated = savedInstanceState != null)
         maybeStartAaTls(intent)
-        carLaunchPending = launchedByCar(intent)
         val firstScreen = if (AppSettings.setupComplete(this)) Screen.HOME else Screen.SETUP
         setContent {
             AaBridgeTheme {
@@ -79,23 +71,16 @@ class MainActivity : ComponentActivity() {
                     Screen.HOME -> HomeScreen(
                         onOpenSettings = { screen = Screen.SETTINGS },
                         onOpenNearby = { openNearby(Screen.HOME) },
-                        showSupportBanner = supportBanner,
-                        onOpenSupport = { supportPopup = true },
                     )
                     Screen.SETTINGS -> SettingsScreen(
                         onBack = back,
                         onHelp = { fromSettings = true; screen = Screen.HELP },
                         onAbout = { fromSettings = true; screen = Screen.ABOUT },
-                        onSupport = { supportPopup = true },
                     )
                     Screen.HELP -> HelpScreen(onBack = back, onRunSetup = { fromSettings = false; screen = Screen.SETUP })
                     Screen.ABOUT -> AboutScreen(onBack = back)
                     Screen.NEARBY -> NearbyCarsScreen(onBack = back, onConnecting = { screen = Screen.HOME })
                 }
-                if (supportPopup) SupportDialog(
-                    onDismiss = { supportPopup = false },
-                    onSupported = { markSupported() },
-                )
             }
         }
     }
@@ -185,22 +170,6 @@ class MainActivity : ComponentActivity() {
         startForegroundService(serviceIntent)
     }
 
-    // When the app is already running, picking it in the USB chooser delivers
-    // the attach intent here instead of onCreate.
-    override fun onResume() {
-        super.onResume()
-        val helped = AppSettings.supportHelped(this)
-        val supported = AppSettings.supported(this)
-        supportBanner = helped
-        val byCar = carLaunchPending
-        carLaunchPending = false
-        val now = System.currentTimeMillis()
-        if (!byCar && SupportAsk.isDue(helped, supported, AppSettings.supportPopupShownAt(this), now)) {
-            supportPopup = true
-            AppSettings.setSupportPopupShownAt(this, now)
-        }
-    }
-
     override fun onStart() {
         super.onStart()
         // Opening the app connects to the remembered car; the cable and a running attempt both win.
@@ -211,22 +180,10 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    /** The car's USB attach opens the app right as the driver sets off; no pop-up then. */
-    private fun launchedByCar(intent: Intent?): Boolean =
-        intent?.action == UsbManager.ACTION_USB_ACCESSORY_ATTACHED &&
-            intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY == 0
-
-    private fun markSupported() {
-        AppSettings.setSupported(this)
-        supportPopup = false
-        Toast.makeText(this, R.string.support_thanks, Toast.LENGTH_LONG).show()
-    }
-
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
         Log.i(TAG, "onNewIntent: action=${intent.action}")
-        carLaunchPending = launchedByCar(intent)
         maybeAutoStartOnAttach(intent)
         maybeStartAaTls(intent)
     }
