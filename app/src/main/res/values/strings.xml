@@ -102,4 +102,9 @@
     <string name="link_wireless_short">Wireless</string>
     <string name="link_cable_short">Cable</string>
 
+    <string name="ui_active">Active</string>
+    <string name="ui_inactive">Inactive</string>
+    <string name="ui_not_connected">Not connected</string>
+    <string name="ui_setup_step">Step %1$d of 4</string>
+    <string name="ui_setup_later">Connect later</string>
 </resources>

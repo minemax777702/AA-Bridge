@@ -63,7 +63,7 @@ fun SubScreen(title: String, onBack: () -> Unit, content: @Composable ColumnScop
             Row(Modifier.padding(horizontal = 8.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = null, tint = Dash.Teal) }
                 Spacer(Modifier.width(2.dp))
-                Text(title.uppercase(), color = Dash.Teal, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.5.sp)
+                Text(title, color = Dash.Text, style = MaterialTheme.typography.titleLarge)
             }
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), content = content)
         }
@@ -76,11 +76,14 @@ fun SettingsScreen(onBack: () -> Unit, onHelp: () -> Unit, onAbout: () -> Unit) 
     SubScreen(stringResource(R.string.settings), onBack) {
         WirelessCarRow()
         DashGroup {
-            SettingsRow(painterResource(R.drawable.ic_help), stringResource(R.string.help), onClick = onHelp)
-            SettingsRow(rememberVectorPainter(Icons.Rounded.Info), stringResource(R.string.settings_about), onClick = onAbout)
             SettingsRow(painterResource(R.drawable.ic_tune), stringResource(R.string.settings_advanced)) {
                 context.startActivity(Intent(context, SettingsActivity::class.java))
             }
+        }
+        DashGroup {
+            SettingsRow(painterResource(R.drawable.ic_help), stringResource(R.string.help), onClick = onHelp)
+            SettingsRow(rememberVectorPainter(Icons.Rounded.Info), stringResource(R.string.settings_about), onClick = onAbout)
+            Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) { SendLogsLink() }
         }
         Byline(Modifier.padding(horizontal = 24.dp, vertical = 16.dp))
     }
@@ -113,7 +116,7 @@ private fun WirelessCarRow() {
 private fun DashGroup(content: @Composable ColumnScope.() -> Unit) {
     val shape = RoundedCornerShape(18.dp)
     Column(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp).clip(shape).background(Dash.Tile).border(1.dp, Dash.TileBorder, shape),
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp).clip(shape).background(Dash.Tile),
         content = content,
     )
 }

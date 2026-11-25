@@ -10,6 +10,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -46,7 +50,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import dev.caraalink.R
@@ -99,13 +102,10 @@ private fun rememberConnection(): ConnectionSnapshot {
 fun BrandBar(modifier: Modifier = Modifier) {
     Column(modifier.padding(horizontal = 24.dp, vertical = 18.dp)) {
         Text(
-            stringResource(R.string.app_name).uppercase(),
-            color = Dash.Teal,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.ExtraBold,
-            letterSpacing = 1.5.sp,
+            stringResource(R.string.app_name),
+            color = Dash.Text,
+            style = MaterialTheme.typography.titleLarge,
         )
-        Byline()
     }
 }
 
@@ -134,96 +134,89 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenNearby: () -> Unit) {
     val state = homeState(serverRunning, carConnected, connection.wireless)
     val searchName = carToRetry(connection, AppSettings.wirelessCar(context))?.name
     val carName = connection.carName ?: searchName ?: stringResource(R.string.state_connected)
-    val alert = state == HomeState.NEEDS_TAP || state == HomeState.NOT_FOUND || state == HomeState.WIFI_OFF
-
-    Column(
-        Modifier
-            .fillMaxSize()
-            .dashGlow(
-                when {
-                    alert -> Dash.GlowAmber
-                    state == HomeState.READY -> Dash.GlowIdle
-                    else -> Dash.GlowTeal
-                },
-            )
-            .systemBarsPadding(),
-    ) {
+    val title = when (state) {
+        HomeState.READY -> stringResource(R.string.home_ready_title)
+        HomeState.NEEDS_TAP -> stringResource(R.string.home_needs_tap_title)
+        HomeState.CONNECTED -> carName
+        HomeState.SEARCHING, HomeState.CONNECTING -> searchName ?: stringResource(R.string.nearby_your_car)
+        HomeState.NOT_FOUND -> if (connection.wireless == WirelessPhase.FAILED)
+            stringResource(R.string.home_failed_title, searchName ?: "") else stringResource(R.string.home_not_found_title)
+        HomeState.WIFI_OFF -> stringResource(R.string.home_wifi_off_title)
+    }
+    val body = when (state) {
+        HomeState.READY -> R.string.home_ready_body
+        HomeState.NEEDS_TAP -> R.string.home_needs_tap_body
+        HomeState.CONNECTED -> R.string.home_connected_body
+        HomeState.SEARCHING -> R.string.home_searching_body
+        HomeState.CONNECTING -> R.string.home_connecting_body
+        HomeState.NOT_FOUND -> R.string.home_not_found_body
+        HomeState.WIFI_OFF -> R.string.home_wifi_off_body
+    }
+    Column(Modifier.fillMaxSize().background(Dash.Background).systemBarsPadding()) {
         DashTopBar(onOpenSettings)
         Column(
             Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Spacer(Modifier.height(20.dp))
-            val car = painterResource(R.drawable.ic_car)
-            val warning = rememberVectorPainter(Icons.Rounded.Warning)
-            when (state) {
-                HomeState.READY -> StatusRing(RingMode.IDLE, car, stringResource(R.string.ring_ready))
-                HomeState.SEARCHING -> StatusRing(RingMode.SPIN, car, stringResource(R.string.ring_searching))
-                HomeState.CONNECTING -> StatusRing(RingMode.SPIN, car, stringResource(R.string.ring_connecting))
-                HomeState.CONNECTED -> StatusRing(RingMode.FULL, car, stringResource(R.string.ring_connected))
-                HomeState.NEEDS_TAP -> StatusRing(RingMode.ALERT, painterResource(R.drawable.ic_touch_app), stringResource(R.string.ring_needs_tap))
-                HomeState.NOT_FOUND -> StatusRing(RingMode.ALERT, warning, stringResource(R.string.ring_not_found))
-                HomeState.WIFI_OFF -> StatusRing(RingMode.ALERT, warning, stringResource(R.string.ring_wifi_off))
-            }
-            Spacer(Modifier.height(22.dp))
-            val title = when (state) {
-                HomeState.READY -> stringResource(R.string.home_ready_title)
-                HomeState.NEEDS_TAP -> stringResource(R.string.home_needs_tap_title)
-                HomeState.CONNECTED -> carName
-                HomeState.SEARCHING, HomeState.CONNECTING -> searchName ?: stringResource(R.string.nearby_your_car)
-                HomeState.NOT_FOUND -> if (connection.wireless == WirelessPhase.FAILED) {
-                    stringResource(R.string.home_failed_title, searchName ?: "")
-                } else {
-                    stringResource(R.string.home_not_found_title)
+            Column(Modifier.widthIn(max = 520.dp).fillMaxWidth()) {
+                Spacer(Modifier.height(24.dp))
+                Column(
+                    Modifier.fillMaxWidth().background(Dash.Tile, RoundedCornerShape(28.dp)).padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    val car = painterResource(R.drawable.ic_car)
+                    val warning = rememberVectorPainter(Icons.Rounded.Warning)
+                    when (state) {
+                        HomeState.READY -> StatusRing(RingMode.IDLE, car, stringResource(R.string.ring_ready))
+                        HomeState.SEARCHING -> StatusRing(RingMode.SPIN, car, stringResource(R.string.ring_searching))
+                        HomeState.CONNECTING -> StatusRing(RingMode.SPIN, car, stringResource(R.string.ring_connecting))
+                        HomeState.CONNECTED -> StatusRing(RingMode.FULL, car, stringResource(R.string.ring_connected))
+                        HomeState.NEEDS_TAP -> StatusRing(RingMode.ALERT, painterResource(R.drawable.ic_touch_app), stringResource(R.string.ring_needs_tap))
+                        HomeState.NOT_FOUND -> StatusRing(RingMode.ALERT, warning, stringResource(R.string.ring_not_found))
+                        HomeState.WIFI_OFF -> StatusRing(RingMode.ALERT, warning, stringResource(R.string.ring_wifi_off))
+                    }
+                    Spacer(Modifier.height(18.dp))
+                    Text(title, style = MaterialTheme.typography.headlineMedium, color = Dash.Text, textAlign = TextAlign.Center)
+                    Spacer(Modifier.height(8.dp))
+                    Text(stringResource(body), style = MaterialTheme.typography.bodyMedium, color = Dash.Muted, textAlign = TextAlign.Center)
+                    if (state == HomeState.NEEDS_TAP) {
+                        Spacer(Modifier.height(16.dp))
+                        MenuHint(stringResource(R.string.menu_start_server))
+                    }
+                    Spacer(Modifier.height(24.dp))
+                    HomeActions(state, connection, onOpenNearby)
                 }
-                HomeState.WIFI_OFF -> stringResource(R.string.home_wifi_off_title)
-            }
-            val body = when (state) {
-                HomeState.READY -> R.string.home_ready_body
-                HomeState.NEEDS_TAP -> R.string.home_needs_tap_body
-                HomeState.CONNECTED -> R.string.home_connected_body
-                HomeState.SEARCHING -> R.string.home_searching_body
-                HomeState.CONNECTING -> R.string.home_connecting_body
-                HomeState.NOT_FOUND -> R.string.home_not_found_body
-                HomeState.WIFI_OFF -> R.string.home_wifi_off_body
-            }
-            Text(title, style = MaterialTheme.typography.headlineMedium, color = Dash.Text, textAlign = TextAlign.Center)
-            Spacer(Modifier.height(6.dp))
-            Text(stringResource(body), style = MaterialTheme.typography.bodyLarge, color = Dash.Muted, textAlign = TextAlign.Center)
-            if (state == HomeState.NEEDS_TAP) {
+                if (state == HomeState.NOT_FOUND) {
+                    connection.suggestion?.let { found ->
+                        Spacer(Modifier.height(12.dp))
+                        SuggestionTile(found.name) { startWireless(context, found.address, found.name) }
+                    }
+                }
                 Spacer(Modifier.height(20.dp))
-                MenuHint(stringResource(R.string.menu_start_server))
+                Column(Modifier.fillMaxWidth().background(Dash.Tile, RoundedCornerShape(20.dp)).padding(horizontal = 16.dp)) {
+                    ConnectionDetail(R.drawable.ic_server, stringResource(R.string.tile_server),
+                        stringResource(if (serverRunning) R.string.ui_active else R.string.ui_inactive), serverRunning)
+                    HorizontalDivider(color = Dash.TileBorder)
+                    val cable = carConnected && connection.link == CarLink.CABLE
+                    ConnectionDetail(if (cable) R.drawable.ic_usb else R.drawable.ic_wifi, stringResource(R.string.tile_link),
+                        stringResource(if (!carConnected) R.string.ui_not_connected else if (cable) R.string.link_cable_short else R.string.link_wireless_short),
+                        carConnected)
+                }
+                Spacer(Modifier.height(24.dp))
             }
-            if (state == HomeState.NOT_FOUND) {
-                connection.suggestion?.let { found -> Spacer(Modifier.height(18.dp)); SuggestionTile(found.name) { startWireless(context, found.address, found.name) } }
-            }
-            Spacer(Modifier.height(24.dp))
         }
-        Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(36.dp, Alignment.CenterHorizontally)) {
-                Telltale(painterResource(R.drawable.ic_server), stringResource(R.string.tile_server), if (serverRunning) Lamp.ON else Lamp.ALERT)
-                val cable = carConnected && connection.link == CarLink.CABLE
-                Telltale(
-                    painterResource(if (cable) R.drawable.ic_usb else R.drawable.ic_wifi),
-                    stringResource(
-                        when {
-                            !carConnected -> R.string.tile_link
-                            cable -> R.string.link_cable_short
-                            else -> R.string.link_wireless_short
-                        },
-                    ),
-                    when {
-                        carConnected -> Lamp.ON
-                        state == HomeState.WIFI_OFF -> Lamp.ALERT
-                        else -> Lamp.OFF
-                    },
-                )
-                Telltale(painterResource(R.drawable.ic_car), stringResource(R.string.tile_car), if (carConnected) Lamp.ON else Lamp.OFF)
-            }
-            Spacer(Modifier.height(16.dp))
-            HomeActions(state, connection, onOpenNearby)
-            SendLogsLink()
-        }
+    }
+}
+
+@Composable
+private fun ConnectionDetail(icon: Int, label: String, value: String, active: Boolean) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+        Icon(painterResource(icon), contentDescription = null, tint = Dash.Muted, modifier = Modifier.size(22.dp))
+        Spacer(Modifier.width(12.dp))
+        Text(label, Modifier.weight(1f), color = Dash.Text, style = MaterialTheme.typography.bodyMedium)
+        Spacer(Modifier.width(12.dp))
+        Text(value, color = if (active) Color(0xFF8DD8B1) else Dash.Muted,
+            style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.End)
     }
 }
 

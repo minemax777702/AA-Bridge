@@ -117,7 +117,9 @@ fun SetupScreen(onDone: () -> Unit, onOpenNearby: () -> Unit) {
                 Text(stringResource(R.string.setup_title), style = MaterialTheme.typography.headlineMedium)
                 Spacer(Modifier.height(4.dp))
                 Text(stringResource(R.string.setup_subtitle), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(Modifier.height(20.dp))
+                Spacer(Modifier.height(12.dp))
+                Text(stringResource(R.string.ui_setup_step, step.coerceIn(1, 4)), color = Dash.Teal, style = MaterialTheme.typography.labelLarge)
+                Spacer(Modifier.height(12.dp))
 
                 StepCard(1, step, R.string.setup_perm_title, R.string.setup_perm_body) {
                     GlowButton(stringResource(R.string.setup_perm_button), {
@@ -149,6 +151,12 @@ fun SetupScreen(onDone: () -> Unit, onOpenNearby: () -> Unit) {
                 }
                 StepCard(4, step, R.string.setup_car_title, R.string.setup_car_body) {
                     TextButton(onClick = onOpenNearby) { Text(stringResource(R.string.home_connect_wireless)) }
+                }
+                if (step == 4) {
+                    TextButton(onClick = {
+                        AppSettings.setSetupComplete(context, true)
+                        onDone()
+                    }) { Text(stringResource(R.string.ui_setup_later)) }
                 }
                 Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { SendLogsLink() }
                 Spacer(Modifier.height(24.dp))
@@ -197,8 +205,10 @@ private fun StepCard(number: Int, current: Int, title: Int, body: Int, action: (
                     fontWeight = FontWeight.SemiBold,
                     color = if (done || active) colors.onSurface else colors.onSurfaceVariant,
                 )
-                Spacer(Modifier.height(4.dp))
-                Text(stringResource(body), style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
+                if (active) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(stringResource(body), style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
+                }
                 if (active && action != null) {
                     Spacer(Modifier.height(12.dp))
                     action()
