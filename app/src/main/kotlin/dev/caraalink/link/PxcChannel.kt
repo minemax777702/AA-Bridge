@@ -23,6 +23,7 @@ class PxcChannel(
 
     private val buffers = HashMap<Int, ByteArray>()
     private val channelOf = HashMap<Int, Int>()
+    internal val carbitAudio = CarbitAudioTransport(::sendCarbitAudio, logger::log)
 
     override fun onOpen(stream: MirrorStream) {
         buffers[stream.localId] = ByteArray(0)
@@ -30,11 +31,31 @@ class PxcChannel(
 
     override fun onClose(stream: MirrorStream) {
         buffers.remove(stream.localId)
-        if (channelOf.remove(stream.localId) == P2C_CHANNEL) stopHeartbeat(stream)
+        val channel = channelOf.remove(stream.localId)
+        if (channel == P2C_CHANNEL && p2cStream === stream) {
+            p2cStream = null
+            stopHeartbeat(stream)
+            carbitAudio.reset()
+        } else if (channel == 0x10000) {
+            carbitAudio.stopMic()
+            carbitAudio.stopPlayback()
+            carbitAudio.reset()
+        }
     }
 
     private var heartbeat: Thread? = null
     @Volatile private var p2cStream: MirrorStream? = null
+
+    /** Raw PCM is never dumped to diagnostic logs. Limit outstanding audio
+     * using the transport's existing queue-age measurement. */
+    private fun sendCarbitAudio(cmd: Int, body: ByteArray): Boolean {
+        val stream = p2cStream?.takeIf { !it.closed } ?: return false
+        if ((cmd and 0xFF000000.toInt()) == 0x60000000 && stream.backlogAgeMs() > 150) return false
+        return runCatching {
+            stream.write(head(cmd, body, 0))
+            !stream.closed
+        }.onFailure { logger.log("Carbit audio write failed: $it") }.getOrDefault(false)
+    }
 
     /** Sends a phone-to-car request on the P2C channel; false if it isn't open. */
     fun sendP2C(cmd: Int, body: ByteArray): Boolean {
@@ -92,6 +113,7 @@ class PxcChannel(
             logger.log("PXC channel open 0x${hex(cmd)} on stream ${stream.localId}")
             stream.write(head(cmd + 1, ByteArray(0), extra))
             if (cmd == P2C_CHANNEL) {
+                if (p2cStream != null && p2cStream !== stream) carbitAudio.reset()
                 p2cStream = stream
                 startHeartbeat(stream)
             }
@@ -99,7 +121,13 @@ class PxcChannel(
         }
         if (channelOf[stream.localId] == P2C_CHANNEL) {
             // Replies to our requests; never answer these.
+            if (p2cStream === stream) carbitAudio.onReply(cmd)
             if (cmd != HEARTBEAT + 1) logger.log("PXC P2C reply 0x${hex(cmd)} len=${body.size}" + preview(body))
+            return
+        }
+        if (cmd == CarbitAudioTransport.MIC_DATA) {
+            stream.write(head(CarbitAudioTransport.MIC_DATA_ACK, ByteArray(0), extra))
+            carbitAudio.onMicData(body)
             return
         }
         if (cmd != HEARTBEAT && cmd != 0x10750 && cmd != 0x10430) {
@@ -107,8 +135,22 @@ class PxcChannel(
         }
         when {
             cmd == CLIENT_INFO -> {
-                runCatching { onClientInfo(JSONObject(String(body, Charsets.UTF_8))) }
+                runCatching {
+                    val info = JSONObject(String(body, Charsets.UTF_8))
+                    carbitAudio.updateMicAllowed(info.opt("supportMic") == true)
+                    onClientInfo(info)
+                }.onFailure { carbitAudio.updateMicAllowed(false) }
                 stream.write(head(cmd + 1, clientInfoReply(), 0))
+            }
+            cmd == CarbitAudioTransport.CAPABILITIES -> {
+                val allowed = runCatching {
+                    val info = JSONObject(String(body, Charsets.UTF_8))
+                    CarbitAudioTransport.Stream.entries.filter {
+                        info.opt(it.name.lowercase(java.util.Locale.ROOT)) == true
+                    }.toSet()
+                }.getOrDefault(emptySet())
+                stream.write(head(cmd + 1, ByteArray(0), extra))
+                carbitAudio.updateCapabilities(allowed)
             }
             needsReply(cmd) -> stream.write(head(cmd + 1, replyBody(cmd) ?: ByteArray(0), 0))
         }

@@ -33,7 +33,7 @@ class CarSession(
     private var config: CaptureConfig? = null
     private var lastBitRate: Int = -1
     private var encoder: CarVideoEncoder? = null
-    private var pxc: PxcChannel? = null
+    @Volatile private var pxc: PxcChannel? = null
     private val features = CarFeatures(context)
     private val display = CarDisplay(context, onOpenAa = { openAndroidAuto() })
 
@@ -115,6 +115,10 @@ class CarSession(
         pollThread = null
         AndroidAutoServer.cancelNeedsTap(context)
         dev.caraalink.aa.AaReconnectBus.onVideoSettingsChanged = null
+        pxc?.carbitAudio?.let { audio ->
+            dev.caraalink.aa.AaSessionProbe.active?.detachCarbitAudio(audio)
+            audio.reset()
+        }
         // Closing an Android Auto connection mid-handshake wedges its server ("Already connected" later).
         if (!keepAndroidAuto) dev.caraalink.aa.AaSessionProbe.active?.stop()
         aaDecoder?.stop()
@@ -189,6 +193,7 @@ class CarSession(
             }
             logger.log("openAndroidAuto: starting AA session probe")
             val probe = dev.caraalink.aa.AaSessionProbe(context)
+            probe.attachCarbitAudio(pxc?.carbitAudio)
             probe.onEstablished = { AndroidAutoServer.cancelNeedsTap(context) }
             probe.onGaveUp = { main.post { onAaNotResponding() } }
             probe.start()
@@ -357,6 +362,7 @@ class CarSession(
         // A restart dismisses the old presentation while staying in AA; only a real exit
         // (showStatus sets mode away from AA first) should stop the probe in onSurface(null).
         val myProbe = dev.caraalink.aa.AaSessionProbe.active
+        myProbe?.attachCarbitAudio(pxc?.carbitAudio)
         display.showAa(
             videoWidth = config.resolution.width,
             videoHeight = config.resolution.height,

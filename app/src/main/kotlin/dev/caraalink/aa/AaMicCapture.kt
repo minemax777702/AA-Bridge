@@ -1,101 +1,129 @@
 package dev.caraalink.aa
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.pm.PackageManager
+import android.media.AudioDeviceInfo
 import android.media.AudioFormat
 import android.media.AudioManager
 import android.media.AudioRecord
 import android.media.MediaRecorder
 import dev.caraalink.diagnostics.DiagnosticLogger
 import dev.caraalink.settings.AppSettings
-import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.abs
 
-/**
- * Captures the phone's mic and streams it to [onChunk] as raw PCM, in the
- * 16kHz/16-bit/mono format advertised in [AaServiceDiscovery]'s mic service.
- * Matches the chunking cadence of openauto's
- * `MediaSourceService::onMediaSourceDataReady` loop (read -> send -> read).
- *
- * Routing follows Settings > Android Auto > "Mic / speaker": with
- * `BT_PREFERRED` or `PHONE_DIRECT` (default), [AudioSource.VOICE_RECOGNITION] follows
- * whatever `AudioManager` currently treats as the active communication
- * device, which is the connected BT headset/car kit's SCO mic when one is
- * present (same as any other app's call audio) and the on-device mic
- * otherwise. `DEVICE_ONLY` explicitly turns Bluetooth SCO off first so a
- * paired BT device can't be picked even if connected.
- */
+/** Captures 16 kHz / 16-bit / mono only during an Android Auto microphone request. */
 class AaMicCapture(private val context: Context, private val onChunk: (ByteArray) -> Unit) {
-
     companion object {
         private const val SAMPLE_RATE = 16_000
-        // 20ms per chunk at 16kHz/16-bit/mono.
         private const val CHUNK_BYTES = (SAMPLE_RATE / 50) * 2
     }
 
     private val logger = DiagnosticLogger(context, "aa-mic")
-    private val running = AtomicBoolean(false)
+    @Volatile private var record: AudioRecord? = null
     private var thread: Thread? = null
-    private var record: AudioRecord? = null
 
-    @SuppressLint("MissingPermission") // caller is responsible for RECORD_AUDIO having been granted
-    fun start() {
-        if (!running.compareAndSet(false, true)) return
-        val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
-        if (AppSettings.aaAudioRoute(context) == AppSettings.AaAudioRoute.DEVICE_ONLY) {
-            runCatching { audioManager?.stopBluetoothSco() }
-            runCatching { audioManager?.isBluetoothScoOn = false }
+    /** Start recording before reporting success, but wait for the protocol response before sending data. */
+    @SuppressLint("MissingPermission")
+    @Synchronized
+    fun prepare(): Boolean {
+        if (record != null) return true
+        if (context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            logger.log("Microphone permission not granted")
+            return false
         }
-        val minBuf = AudioRecord.getMinBufferSize(SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
-        if (minBuf <= 0) {
-            logger.log("getMinBufferSize failed: $minBuf")
-            running.set(false)
-            return
+        var candidate: AudioRecord? = null
+        return try {
+            val minimum = AudioRecord.getMinBufferSize(SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
+            check(minimum > 0) { "Invalid microphone buffer size: $minimum" }
+            val rec = AudioRecord(
+                MediaRecorder.AudioSource.VOICE_RECOGNITION, SAMPLE_RATE,
+                AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT,
+                minimum.coerceAtLeast(CHUNK_BYTES * 4),
+            )
+            candidate = rec
+            check(rec.state == AudioRecord.STATE_INITIALIZED) { "AudioRecord initialization failed" }
+            selectInput(rec)
+            rec.startRecording()
+            check(rec.recordingState == AudioRecord.RECORDSTATE_RECORDING) { "AudioRecord did not start" }
+            record = rec
+            logger.log("Microphone started, device=${rec.routedDevice?.type}")
+            true
+        } catch (e: Exception) {
+            logger.log("Microphone start failed: $e")
+            runCatching { candidate?.release() }
+            false
         }
-        val rec = AudioRecord(
-            MediaRecorder.AudioSource.VOICE_RECOGNITION,
-            SAMPLE_RATE,
-            AudioFormat.CHANNEL_IN_MONO,
-            AudioFormat.ENCODING_PCM_16BIT,
-            minBuf.coerceAtLeast(CHUNK_BYTES * 4),
-        )
-        if (rec.state != AudioRecord.STATE_INITIALIZED) {
-            logger.log("AudioRecord init failed")
-            rec.release()
-            running.set(false)
-            return
+    }
+
+    private fun selectInput(rec: AudioRecord) {
+        val manager = context.getSystemService(AudioManager::class.java) ?: return
+        val devices = manager.getDevices(AudioManager.GET_DEVICES_INPUTS)
+        val useBluetooth = AppSettings.aaAudioRoute(context) != AppSettings.AaAudioRoute.DEVICE_ONLY
+        val bluetooth = if (useBluetooth) devices.firstOrNull { it.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO } else null
+        val device = bluetooth ?: devices.firstOrNull { it.type == AudioDeviceInfo.TYPE_BUILTIN_MIC }
+        if (device != null) {
+            val accepted = rec.setPreferredDevice(device)
+            logger.log("Microphone preferred type=${device.type} accepted=$accepted")
         }
-        record = rec
-        rec.startRecording()
+    }
+
+    @Synchronized
+    fun startStreaming() {
+        val rec = record ?: return
+        if (thread != null) return
         thread = Thread({
-            val buf = ByteArray(CHUNK_BYTES)
+            val buffer = ByteArray(CHUNK_BYTES)
             var chunks = 0
             var peak = 0
-            while (running.get()) {
-                val n = rec.read(buf, 0, buf.size)
-                if (n <= 0) continue
-                for (i in 0 until n - 1 step 2) {
-                    peak = maxOf(peak, abs((buf[i + 1].toInt() shl 8) or (buf[i].toInt() and 0xFF)))
-                }
-                // Once a second: a peak of 0 is Android handing us silence.
-                if (++chunks % 50 == 0) {
-                    // stop() may release the recorder meanwhile.
-                    runCatching {
-                        logger.log("peak=$peak silenced=${rec.activeRecordingConfiguration?.isClientSilenced} device=${rec.routedDevice?.type}")
+            try {
+                while (record === rec) {
+                    val count = rec.read(buffer, 0, buffer.size)
+                    if (count < 0) {
+                        logger.log("Microphone read failed: $count")
+                        break
                     }
-                    peak = 0
+                    if (count == 0) {
+                        Thread.sleep(10)
+                        continue
+                    }
+                    for (i in 0 until count - 1 step 2) {
+                        peak = maxOf(peak, abs((buffer[i + 1].toInt() shl 8) or (buffer[i].toInt() and 0xFF)))
+                    }
+                    if (++chunks % 50 == 0) {
+                        runCatching {
+                            // Re-evaluate the input after Bluetooth is disconnected.
+                            if (rec.routedDevice?.type != AudioDeviceInfo.TYPE_BUILTIN_MIC &&
+                                (AppSettings.aaAudioRoute(context) == AppSettings.AaAudioRoute.DEVICE_ONLY ||
+                                    context.getSystemService(AudioManager::class.java)
+                                        ?.getDevices(AudioManager.GET_DEVICES_INPUTS)
+                                        ?.none { it.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO } == true)
+                            ) selectInput(rec)
+                            logger.log("peak=$peak silenced=${rec.activeRecordingConfiguration?.isClientSilenced} device=${rec.routedDevice?.type}")
+                        }
+                        peak = 0
+                    }
+                    if (record === rec) onChunk(buffer.copyOf(count))
                 }
-                onChunk(if (n == buf.size) buf.copyOf() else buf.copyOf(n))
+            } catch (_: InterruptedException) {
+            } catch (e: Exception) {
+                logger.log("Microphone capture failed: $e")
+            } finally {
+                synchronized(this) {
+                    if (record === rec) stop()
+                }
             }
         }, "AaMicCapture").apply { isDaemon = true; start() }
     }
 
+    @Synchronized
     fun stop() {
-        if (!running.compareAndSet(true, false)) return
+        val rec = record
+        record = null
         thread?.interrupt()
         thread = null
-        runCatching { record?.stop() }
-        runCatching { record?.release() }
-        record = null
+        runCatching { rec?.stop() }
+        runCatching { rec?.release() }
     }
 }

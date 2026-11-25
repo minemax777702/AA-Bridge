@@ -41,4 +41,6 @@
     <string name="pref_auto_save_crash_log_summary">On a crash, save the current log straight to Downloads automatically -- no need to dig through Developer tools afterward</string>
     <string name="pref_developer_tools_title">Developer tools</string>
     <string name="pref_developer_tools_summary">Log export, Car Preview</string>
+    <string name="pref_aa_carbit_mic_title">CarbitLink car microphone (experimental)</string>
+    <string name="pref_aa_carbit_mic_summary">Only in CarbitLink audio mode. Uses the car mic during Android Auto voice requests when supported, otherwise the phone or Bluetooth.</string>
 </resources>

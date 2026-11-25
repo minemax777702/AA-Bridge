@@ -59,4 +59,21 @@ class AaServiceDiscoveryTest {
         assertEquals(0, widthMargin)
         assertEquals(0, heightMargin)
     }
+
+    @Test
+    fun `experimental speech service negotiates PCM mono only when enabled`() {
+        fun services(config: AaServiceDiscovery.Config) = AaProtobuf.parse(AaServiceDiscovery.build(config))
+            .filter { it.number == 1 }.map { AaProtobuf.parse(it.bytes!!) }
+        val id = AaServiceDiscovery.CHANNEL_MEDIA_SINK_SPEECH_AUDIO.toLong()
+        assertEquals(false, services(AaServiceDiscovery.Config()).any { it.first { f -> f.number == 1 }.varint == id })
+        val speech = services(AaServiceDiscovery.Config(carbitSpeech = true))
+            .single { it.first { f -> f.number == 1 }.varint == id }
+        val sink = AaProtobuf.parse(speech.first { it.number == 3 }.bytes!!)
+        val format = AaProtobuf.parse(sink.first { it.number == 3 }.bytes!!)
+        assertEquals(AaServiceDiscovery.CODEC_AUDIO_PCM.toLong(), sink.first { it.number == 1 }.varint)
+        assertEquals(AaServiceDiscovery.AUDIO_STREAM_SPEECH.toLong(), sink.first { it.number == 2 }.varint)
+        assertEquals(16000L, format.first { it.number == 1 }.varint)
+        assertEquals(16L, format.first { it.number == 2 }.varint)
+        assertEquals(1L, format.first { it.number == 3 }.varint)
+    }
 }

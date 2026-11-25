@@ -86,6 +86,11 @@
             android:entryValues="@array/aa_audio_route_values"
             android:defaultValue="phone_direct" />
         <SwitchPreferenceCompat
+            android:key="aa_carbit_mic"
+            android:title="@string/pref_aa_carbit_mic_title"
+            android:summary="@string/pref_aa_carbit_mic_summary"
+            android:defaultValue="false" />
+        <SwitchPreferenceCompat
             android:key="aa_auto_crop"
             android:title="@string/pref_aa_auto_crop_title"
             android:summary="@string/pref_aa_auto_crop_summary"

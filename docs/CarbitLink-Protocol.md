@@ -201,7 +201,62 @@ relevant to CarAALink's USB-AOA implementation and not analyzed further.
   repeat behavior we do.
 - The exact structure of the `0x00010370` "content"/"value" blob -- looks
   encrypted, not inspected further.
-- Audio channel framing (not captured/analyzed this pass).
+- Real head-unit support, audio buffering and microphone negotiation across firmware versions.
 
 Do not fill these in from guesswork -- update this file only from a new
 capture or decompile finding, same rule as everywhere else in this repo.
+
+## Layer 7: Audio (experimental)
+
+Source: user-supplied CarbitLink-EasyConnection 6.5.1 APK, SHA256
+`545059ccc0db49d613268c3d5d12e6916649ce3f467a77d1198882977841c9e7`.
+Static analysis of `lib/arm64-v8a/libEPSDK.so` (ELF virtual addresses; no proprietary binaries or code copied):
+
+| Function / address | Finding |
+|---|---|
+| C2PMainService::handleEnableDownloadPhoneAudio, 0x1c0240 | C2P 0x10020 reads tts, vr, talkie, music; reply 0x10021 echoes extra |
+| P2CMainService::sendAudioStart, 0x1c2c80 | 0x20090 JSON type, sampleRate, channel, format; expects 0x20091 before success |
+| P2CMainService::sendAudioData, 0x1c301c | 0x60000030 for music (SDK type 8); raw data payload |
+| P2CMainService::sendAudioStop, 0x1c30f0 | 0x200D0 JSON type; expects 0x200D1 |
+| P2CMainService::startAudioRecord, 0x1c33d4 | 0x200F0 with sampleRate/channel/format, ACK 0x200F1 |
+| P2CMainService::stopAudioRecord, 0x1c364c | 0x20100, ACK 0x20101 |
+| C2PMainService::handleMicRecordData, 0x1c07b4 | 0x10060 raw input, ACK 0x10061 echoes extra |
+
+Music wire type is 4 (SDK enum 8 is mapped to JSON type 4). PCM S16_LE
+format 3 is from the DEX EPAudioFormatType enum. Use 48000 Hz stereo for
+the decoded AA media channel. The existing PXC framing is reused.
+
+### Additional audio and microphone findings
+
+- `sendAudioData` table at 0x1392e0 maps SDK types 1, 2, 4, 8
+  to 0x60000000, 0x60000010, 0x60000020, 0x60000030.
+- `sendAudioStart` and `sendAudioStop` map SDK enum values to
+  JSON types 1 (TTS), 2 (VR), 3 (Talkie), 4 (Music).
+- `handleEnableDownloadPhoneAudio` at 0x1c0240 reads boolean
+  `tts`, `vr`, `talkie`, `music`; each must explicitly be true.
+- `handleClientInfo` at 0x1bef68 checks boolean `supportMic` and calls
+  `EPAudioManager::enableAudioRecod` at 0x1befe8.
+- `startAudioRecord` sends JSON sampleRate/channel/format without a
+  type; `stopAudioRecord` has an empty body. Mic data ACK echoes
+  the extra field and has an empty body (0x1c07e8–0x1c0800).
+- Start/stop playback ACKs have no validated stream correlation in
+  the SDK. The implementation serializes pending playback requests.
+  A timeout disables remote playback until a new connection.
+
+### AA integration and limitations
+
+Opt-in CarbitLink audio negotiates the existing AAC media sink plus a
+16 kHz/16-bit/mono speech sink (AA AudioType SPEECH=1, see
+https://github.com/mrmees/open-android-auto/blob/main/docs/channels/audio.md).
+Selecting VR during mic requests or transient audio focus is an integration
+heuristic, not a proven semantic mapping. Low-level Talkie is implemented
+and tested; no AA telephony/PTT source is mapped to it without more
+evidence. Calls keep the Bluetooth/OS path. PCM formats are the chosen AA
+formats, not a firmware guarantee.
+
+The mic checkbox is off by default and requires CarbitLink audio mode,
+RECORD_AUDIO, supportMic=true, start ACK and actual PCM. Only an AA
+microphone request starts it. Data is bounded, never logged, discarded
+on close. Missing/stalled mic data falls back to local capture. Output
+falls back to phone/Bluetooth if unsupported, congested or unacknowledged.
+No QDLink wire changes. All paths need real-vehicle verification.

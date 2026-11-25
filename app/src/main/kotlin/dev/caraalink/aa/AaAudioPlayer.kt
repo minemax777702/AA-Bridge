@@ -2,14 +2,12 @@ package dev.caraalink.aa
 
 import android.content.Context
 import android.media.AudioAttributes
-import android.media.AudioDeviceInfo
 import android.media.AudioFormat
 import android.media.AudioManager
 import android.media.AudioTrack
 import android.media.MediaCodec
 import android.media.MediaFormat
 import android.util.Log
-import dev.caraalink.settings.AppSettings
 import java.nio.ByteBuffer
 
 /**
@@ -30,6 +28,7 @@ class AaAudioPlayer(
     private val channelCount: Int,
     /** True only for the on-phone Car Preview session -- see AaServiceDiscovery.configFromSettings(). */
     private val preview: Boolean = false,
+    private val remotePcm: (ByteArray) -> Boolean = { false },
 ) {
 
     companion object {
@@ -39,9 +38,11 @@ class AaAudioPlayer(
     private var codec: MediaCodec? = null
     private var track: AudioTrack? = null
     private var trackStarted = false
+    private var remoteFormatSupported = false
     private val bufferInfo = MediaCodec.BufferInfo()
     private var lastCsd0: ByteArray? = null
     private val logger = dev.caraalink.diagnostics.DiagnosticLogger(context, "aa-audio")
+    private val route = AaOutputRoute(context, preview, logger)
 
     /**
      * No-ops if [csd0] matches what's already configured and a decoder is
@@ -88,65 +89,7 @@ class AaAudioPlayer(
             .setBufferSizeInBytes(minBuf.coerceAtLeast(4096) * 2)
             .setTransferMode(AudioTrack.MODE_STREAM)
             .build()
-        // CarbitLink's own wire protocol doesn't carry audio to the car at
-        // all (its Packet framing for audio is still unconfirmed -- see
-        // claude/roadmap.md item 6 -- so nothing here invents bytes for it).
-        // The practical way AA audio actually reaches the car's speakers
-        // today is the car's own Bluetooth, which almost every head unit
-        // already has paired for calls/music. Explicitly steering output to
-        // a connected A2DP device (instead of hoping default routing picks
-        // it over the earpiece/speaker) is what "Mic / speaker for Android
-        // Auto" = BT preferred now also controls for playback, not just mic.
-        if (preview) {
-            // Car Preview is always played on THIS phone, regardless of the
-            // real car's "Mic / speaker for Android Auto" setting -- that
-            // setting is about the real car's Bluetooth, meaningless here,
-            // and respecting it in preview was a confirmed real regression:
-            // whatever the owner last had it set to for real-car testing
-            // silently carried over and routed preview audio wrong too.
-            // Always force the phone's own speaker in preview instead.
-            val am = context.getSystemService(AudioManager::class.java)
-            val speaker = am?.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
-                ?.firstOrNull { it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER }
-            if (speaker != null) {
-                runCatching { t.preferredDevice = speaker }
-                logger.log("AA audio (preview) -> built-in speaker (forced)")
-            } else {
-                logger.log("AA audio (preview) -> default routing (no built-in speaker device found)")
-            }
-        } else {
-            // Unconstrained ("default") routing is the risky case: this app
-            // always has an active USB accessory connection to the dongle
-            // for the whole session, and PCM has repeatedly shown up as
-            // genuinely written to AudioTrack (real frames-delivered counts)
-            // while still reported inaudible -- consistent with audio
-            // silently going out over that USB connection instead of
-            // anywhere audible. Always pick an explicit device: A2DP if
-            // BT-preferred and actually connected, else the phone's own
-            // speaker as a safe, always-audible fallback (confirmed live:
-            // "BT-preferred but no A2DP device" was hitting unconstrained
-            // routing and going silent, even with the car paired over BT).
-            val am = context.getSystemService(AudioManager::class.java)
-            val devices = am?.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
-            val a2dp = if (AppSettings.aaAudioRoute(context) == AppSettings.AaAudioRoute.BT_PREFERRED) {
-                devices?.firstOrNull { it.type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP }
-            } else null
-            when {
-                a2dp != null -> {
-                    runCatching { t.preferredDevice = a2dp }
-                    logger.log("AA audio -> Bluetooth A2DP (${a2dp.productName})")
-                }
-                else -> {
-                    val speaker = devices?.firstOrNull { it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER }
-                    if (speaker != null) {
-                        runCatching { t.preferredDevice = speaker }
-                        logger.log("AA audio -> built-in speaker (no A2DP device found/wanted)")
-                    } else {
-                        logger.log("AA audio -> default routing (no built-in speaker device found)")
-                    }
-                }
-            }
-        }
+        route.refresh(t, force = true)
         // PCM has repeatedly shown up as genuinely written to AudioTrack
         // (confirmed via its own "frames delivered" log on stop()) while
         // still being reported inaudible -- logging the actual media stream
@@ -170,6 +113,7 @@ class AaAudioPlayer(
         codec = c
         track = t
         trackStarted = false
+        remoteFormatSupported = false
     }
 
     @Synchronized
@@ -185,11 +129,31 @@ class AaAudioPlayer(
                 c.queueInputBuffer(inIndex, 0, aacFrame.size, 0, 0)
             }
             var outIndex = c.dequeueOutputBuffer(bufferInfo, 0)
+            if (outIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
+                val actual = c.outputFormat
+                remoteFormatSupported = actual.getInteger(MediaFormat.KEY_SAMPLE_RATE) == 48000 &&
+                    actual.getInteger(MediaFormat.KEY_CHANNEL_COUNT) == 2 &&
+                    (!actual.containsKey(MediaFormat.KEY_PCM_ENCODING) ||
+                        actual.getInteger(MediaFormat.KEY_PCM_ENCODING) == AudioFormat.ENCODING_PCM_16BIT)
+                outIndex = c.dequeueOutputBuffer(bufferInfo, 0)
+            }
             while (outIndex >= 0) {
                 val out = c.getOutputBuffer(outIndex)
                 if (out != null && bufferInfo.size > 0) {
                     val pcm = ByteArray(bufferInfo.size)
+                    out.position(bufferInfo.offset)
+                    out.limit(bufferInfo.offset + bufferInfo.size)
                     out.get(pcm)
+                    if (remoteFormatSupported && remotePcm(pcm)) {
+                        if (trackStarted) {
+                            t.pause()
+                            t.flush()
+                            trackStarted = false
+                        }
+                        c.releaseOutputBuffer(outIndex, false)
+                        outIndex = c.dequeueOutputBuffer(bufferInfo, 0)
+                        continue
+                    }
                     // Lazy start: the first real PCM is the signal there's
                     // actually something to play. Starting at setCodecConfig()
                     // time instead left the track spinning empty -- see there.
@@ -197,6 +161,7 @@ class AaAudioPlayer(
                         t.play()
                         trackStarted = true
                     }
+                    route.refresh(t)
                     t.write(pcm, 0, pcm.size)
                 }
                 c.releaseOutputBuffer(outIndex, false)
