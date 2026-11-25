@@ -181,6 +181,8 @@ class AaSessionProbe(
     @Volatile
     private var audioPlayer: AaAudioPlayer? = null
 
+    @Volatile private var pcmPlayer: AaPcmPlayer? = null
+
     // AVMediaAckIndication (0x8004) flow control, confirmed from
     // mrmees/open-android-auto's protocol docs (GPL-3.0, paraphrased facts
     // only -- field numbers/names, not their prose): every MEDIA_SETUP
@@ -595,12 +597,7 @@ class AaSessionProbe(
                             .int(2, maxUnacked)
                             .int(3, 0) // configuration_indices[0]
                             .build()
-                        val responseId = if (message.channelId == AaServiceDiscovery.CHANNEL_MEDIA_SOURCE_MICROPHONE) {
-                            AaFraming.MSG_MEDIA_SETUP
-                        } else {
-                            AaFraming.MSG_MEDIA_CONFIG
-                        }
-                        channel.sendChannelSpecific(message.channelId, responseId, config)
+                        channel.sendChannelSpecific(message.channelId, AaFraming.MSG_MEDIA_CONFIG, config)
                         if (message.channelId == AaServiceDiscovery.CHANNEL_MEDIA_SINK_VIDEO) {
                             // VideoFocusNotification{focus=PROJECTED(1), unsolicited=false}:
                             // openauto's VideoMediaSinkService::sendVideoFocusIndication(),
@@ -659,7 +656,13 @@ class AaSessionProbe(
                         // which is the actual reason AA audio wasn't playing, not
                         // Bluetooth routing.
                         if (phoneMediaAudio) {
-                            // Only PCM system sounds arrive here (music plays on the phone). Ack and drop.
+                            // In PHONE_DIRECT mode media plays on the phone; the negotiated system sink is PCM.
+                            val offset = if (chId == AaFraming.MSG_MEDIA_DATA) 8 else 0
+                            if (chBody.size > offset) {
+                                val player = pcmPlayer ?: AaPcmPlayer(context, config.preview).also { pcmPlayer = it }
+                                val pcm = chBody.copyOfRange(offset, chBody.size)
+                                audioExecutor.execute { player.feed(pcm) }
+                            }
                         } else if (chId == AaFraming.MSG_MEDIA_CODEC_CONFIG) {
                             logger.log("RX MEDIA_CODEC_CONFIG on MEDIA_SINK_MEDIA_AUDIO (${chBody.size}B)")
                             if (chBody.isNotEmpty()) {
@@ -698,27 +701,28 @@ class AaSessionProbe(
                     } else if (chId == AaFraming.MSG_MEDIA_MICROPHONE_REQUEST &&
                         message.channelId == AaServiceDiscovery.CHANNEL_MEDIA_SOURCE_MICROPHONE
                     ) {
-                        // MicrophoneRequest{open=1 bool}. Reply MicrophoneResponse{status=1,
-                        // session_id=2} on the SAME id (aasdk quirk, see AaFraming), then
-                        // start/stop capture -- openauto's onMediaSourceOpenRequest()/
-                        // onMediaSourceOpenSuccess() flow.
+                        // AV_INPUT_OPEN_REQUEST (0x8005) and AV_INPUT_OPEN_RESPONSE (0x8006).
+                        // Response fields: session ID (1), result value (2: 0 success, 1 failure).
                         val open = AaProtobuf.parse(chBody).firstOrNull { it.number == 1 }?.varint == 1L
                         logger.log("RX MICROPHONE_REQUEST open=$open")
-                        val response = AaProtobuf.Writer().int(1, 0).int(2, 0).build() // status=SUCCESS, session_id=0
-                        channel.sendChannelSpecific(message.channelId, AaFraming.MSG_MEDIA_MICROPHONE_REQUEST, response)
-                        if (open) {
-                            micCapture?.stop()
-                            micCapture = AaMicCapture(context) { pcm ->
-                                val payload = ByteArray(8 + pcm.size)
-                                var ts = System.nanoTime() / 1000
-                                for (i in 7 downTo 0) { payload[i] = (ts and 0xFF).toByte(); ts = ts shr 8 }
-                                pcm.copyInto(payload, 8)
-                                runCatching {
-                                    channel.sendChannelSpecific(message.channelId, AaFraming.MSG_MEDIA_DATA, payload)
-                                }
-                            }.also { it.start() }
-                        } else {
-                            micCapture?.stop()
+                        micCapture?.stop()
+                        micCapture = null
+                        val capture = if (open) AaMicCapture(context) { pcm ->
+                            val payload = ByteArray(8 + pcm.size)
+                            var ts = System.nanoTime() / 1000
+                            for (i in 7 downTo 0) { payload[i] = (ts and 0xFF).toByte(); ts = ts shr 8 }
+                            pcm.copyInto(payload, 8)
+                            runCatching {
+                                channel.sendChannelSpecific(message.channelId, AaFraming.MSG_MEDIA_DATA, payload)
+                            }.onFailure { logger.log("Microphone send failed: $it") }
+                        } else null
+                        micCapture = capture
+                        val success = capture?.prepare() ?: !open
+                        val response = AaProtobuf.Writer().int(1, 0).int(2, if (success) 0 else 1).build()
+                        channel.sendChannelSpecific(message.channelId, AaFraming.MSG_MEDIA_MICROPHONE_RESPONSE, response)
+                        if (success) capture?.startStreaming()
+                        else {
+                            capture?.stop()
                             micCapture = null
                         }
                     } else if (chId == AaFraming.MSG_INPUT_BINDING_REQUEST && message.channelId == AaServiceDiscovery.CHANNEL_INPUT_SOURCE) {
@@ -815,6 +819,8 @@ class AaSessionProbe(
             micCapture = null
             audioPlayer?.stop()
             audioPlayer = null
+            pcmPlayer?.stop()
+            pcmPlayer = null
             runCatching { socket?.close() }
             socket = null
         }

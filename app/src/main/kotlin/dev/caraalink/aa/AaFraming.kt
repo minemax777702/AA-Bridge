@@ -78,6 +78,7 @@ object AaFraming {
     const val MSG_MEDIA_VIDEO_FOCUS_NOTIFICATION = 32776
     const val MSG_AV_MEDIA_ACK = 32772
     const val MSG_MEDIA_MICROPHONE_REQUEST = 32773
+    const val MSG_MEDIA_MICROPHONE_RESPONSE = 32774
     // Quirk, cited from aasdk's MediaSourceService::sendMicrophoneOpenResponse():
     // the response re-sends the REQUEST id, there is no separate response id in
     // practice even though MediaMessageId.proto defines 32774.
