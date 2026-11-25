@@ -32,6 +32,7 @@ class CarSession(
     private val huLogger = DiagnosticLogger(context, "hu-compatibility")
     private val hu = dev.caraalink.diagnostics.HuCompatibility
     private val huToken = Any()
+    private var calibrationContact: Int? = null
     @Volatile private var calibrationMapping: dev.caraalink.diagnostics.HuCalibration.Mapping? = null
     private val tools = dev.caraalink.diagnostics.HuDiagnosticTools
     private fun registerDiagnosticTools() {
@@ -497,9 +498,13 @@ class CarSession(
         if (c.width <= 0 || c.height <= 0) return
         val raw = dev.caraalink.diagnostics.HuCalibration.Point(x.toDouble()/c.width, y.toDouble()/c.height)
         if (display.mode == CarDisplay.Mode.CALIBRATION || tools.state.value.calibrating) {
-            if (action == android.view.MotionEvent.ACTION_DOWN && slot == 0) tools.tap(huToken, raw)
+            if (action == android.view.MotionEvent.ACTION_DOWN && calibrationContact == null) {
+                calibrationContact = slot
+                tools.tap(huToken, raw)
+            } else if (action == android.view.MotionEvent.ACTION_UP && calibrationContact == slot) calibrationContact = null
             return
         }
+        calibrationContact = null
         if (action == android.view.MotionEvent.ACTION_DOWN) {
             observedSlots.add(slot)
             if (observedSlots.size > 1) hu.multiTouch(huToken)
@@ -513,6 +518,7 @@ class CarSession(
     }
 
     @Synchronized override fun onTouchCancel() {
+        calibrationContact = null
         observedSlots.clear()
         singleTouch.reset()
         display.cancelTouch()
