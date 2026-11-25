@@ -98,7 +98,7 @@ fun DashTopBar(onOpenSettings: () -> Unit) {
                     tint = Dash.Teal, modifier = Modifier.size(22.dp))
             }
             Spacer(Modifier.width(12.dp))
-            Text("AA Bridge", style = MaterialTheme.typography.titleLarge.copy(fontSize = 23.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.5).sp))
+            Text(stringResource(R.string.ui_brand_name), style = MaterialTheme.typography.titleLarge.copy(fontSize = 23.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.5).sp))
         }
         IconButton(onClick = onOpenSettings, modifier = Modifier.background(Dash.Tile, RoundedCornerShape(16.dp))) {
             Icon(Icons.Rounded.Settings, contentDescription = stringResource(R.string.settings), tint = Dash.Muted)

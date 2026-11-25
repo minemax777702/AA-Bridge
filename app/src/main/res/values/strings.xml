@@ -109,4 +109,5 @@
     <string name="ui_setup_later">Connect later</string>
     <string name="ui_connection_details">Connection details</string>
     <string name="ui_settings_advanced_summary">Display, audio, connection and diagnostics</string>
+    <string name="ui_brand_name" translatable="false">AA Bridge</string>
 </resources>
