@@ -2,7 +2,7 @@ import java.util.Properties
 
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
+    id("org.jetbrains.kotlin.plugin.compose")
 }
 
 /** Release signing comes from the gitignored keystore.properties. Without it, release builds come out unsigned. */
@@ -33,10 +33,6 @@ android {
         compose = true
     }
 
-    composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.14"
-    }
-
     signingConfigs {
         if (releaseKeys != null) create("release") {
             storeFile = file(releaseKeys.getProperty("storeFile"))
@@ -58,9 +54,6 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
-    }
 }
 
 dependencies {
