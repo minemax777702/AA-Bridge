@@ -114,6 +114,7 @@ class CarSession(
         val pxc = PxcChannel(logger, { info -> onClientInfo(info) }, features::replyBody).also {
             this.pxc = it
             it.observer = { command, body -> onHuMessage("PXC", command, body) }
+            it.txObserver = { command, body -> onHuTx("PXC", command, body) }
         }
         val ctrl = MirrorControlChannel(logger, this, context)
         val data = MirrorDataChannel(logger, this)
@@ -522,6 +523,11 @@ class CarSession(
         observedSlots.clear()
         singleTouch.reset()
         display.cancelTouch()
+    }
+
+    override fun onHuTx(channel: String, command: Int, body: ByteArray) {
+        if (dev.caraalink.settings.AppSettings.huCapture(context) && command !in listOf(0x10060,0x10061,0x70000000,0x70000001,0x41))
+            huLogger.log("HU TX $channel:0x${command.toUInt().toString(16)} len=${body.size}")
     }
 
     override fun onHuMessage(channel: String, command: Int, body: ByteArray) {

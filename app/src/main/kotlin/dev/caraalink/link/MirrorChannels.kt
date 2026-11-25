@@ -77,6 +77,7 @@ interface MirrorHost {
     fun onTouch(action: Int, x: Int, y: Int, slot: Int) = onTouch(action, x, y)
     fun onTouchCancel() = Unit
     fun onHuMessage(channel: String, command: Int, body: ByteArray) = Unit
+    fun onHuTx(channel: String, command: Int, body: ByteArray) = Unit
     fun onKey(key: Int)
     fun onDataStreamOpen(stream: MirrorStream)
     fun onDataStreamClosed(stream: MirrorStream)
@@ -130,6 +131,11 @@ class MirrorControlChannel(
         framer.feed(data) { type, body -> handle(stream, type, body) }
     }
 
+    private fun reply(stream: MirrorStream, type: Int, body: ByteArray?) {
+        if (type != 0x41) host.onHuTx("MIRROR", type, body ?: ByteArray(0))
+        stream.write(req(type, body))
+    }
+
     private fun handle(stream: MirrorStream, type: Int, body: ByteArray) {
         // Protocol sniffer (Settings > Debug > "Verbose protocol logging"):
         // normally heartbeat/screen-event are too frequent to log, but when
@@ -142,8 +148,8 @@ class MirrorControlChannel(
             logger.log("MIRROR ctrl 0x%04X len=%d [sniff] ".format(type, body.size) + dev.caraalink.diagnostics.ProtocolSniffer.hexPreview(body))
         }
         when (type) {
-            REQ_GET_VERSION -> stream.write(req(0x31, ByteBuffer.allocate(8).order(ByteOrder.LITTLE_ENDIAN).putInt(5002).putInt(1).array()))
-            REQ_HEARTBEAT -> stream.write(req(0x41, null))
+            REQ_GET_VERSION -> reply(stream, 0x31, ByteBuffer.allocate(8).order(ByteOrder.LITTLE_ENDIAN).putInt(5002).putInt(1).array())
+            REQ_HEARTBEAT -> reply(stream, 0x41, null)
             REQ_CONFIG_CAPTURE -> {
                 val cfg = CaptureConfig.parse(body)
                 logger.log("CONFIG_CAPTURE $cfg")
@@ -151,9 +157,9 @@ class MirrorControlChannel(
                 val rly = ByteBuffer.allocate(if (cfg.supportExtendProtocol != 0) 9 else 8).order(ByteOrder.LITTLE_ENDIAN)
                     .putInt(H264).putShort(cfg.encodeWidth.toShort()).putShort(cfg.encodeHeight.toShort())
                 if (cfg.supportExtendProtocol != 0) rly.put(cfg.supportExtendProtocol.toByte())
-                stream.write(req(0x11, rly.array()))
+                reply(stream, 0x11, rly.array())
             }
-            REQ_DATA_START -> stream.write(req(if (host.onStartVideo()) 0x71 else RLY_INIT_FAILED, null))
+            REQ_DATA_START -> reply(stream, if (host.onStartVideo()) 0x71 else RLY_INIT_FAILED, null)
             REQ_SCREEN_EVENT -> {
                 if (body.size < 10) return
                 val bb = ByteBuffer.wrap(body).order(ByteOrder.LITTLE_ENDIAN)
@@ -169,7 +175,7 @@ class MirrorControlChannel(
                     4 -> host.onKey(key)
                 }
             }
-            else -> stream.write(req(RLY_UN_SUPPORT, null))
+            else -> reply(stream, RLY_UN_SUPPORT, null)
         }
     }
 
