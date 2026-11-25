@@ -53,11 +53,13 @@
         <item>Bluetooth if connected, else phone</item>
         <item>Always phone mic/speaker</item>
         <item>Phone plays music and prompts (Bluetooth or phone speaker)</item>
+        <item>CarbitLink audio (experimental, with local fallback)</item>
     </string-array>
     <string-array name="aa_audio_route_values">
         <item>bt_preferred</item>
         <item>device_only</item>
         <item>phone_direct</item>
+        <item>carbit_experimental</item>
     </string-array>
 
     <!--

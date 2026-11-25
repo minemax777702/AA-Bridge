@@ -28,6 +28,7 @@ class AaAudioPlayer(
     private val channelCount: Int,
     /** True only for the on-phone Car Preview session -- see AaServiceDiscovery.configFromSettings(). */
     private val preview: Boolean = false,
+    private val remotePcm: (ByteArray) -> Boolean = { false },
 ) {
 
     companion object {
@@ -37,6 +38,7 @@ class AaAudioPlayer(
     private var codec: MediaCodec? = null
     private var track: AudioTrack? = null
     private var trackStarted = false
+    private var remoteFormatSupported = false
     private val bufferInfo = MediaCodec.BufferInfo()
     private var lastCsd0: ByteArray? = null
     private val logger = dev.caraalink.diagnostics.DiagnosticLogger(context, "aa-audio")
@@ -111,6 +113,7 @@ class AaAudioPlayer(
         codec = c
         track = t
         trackStarted = false
+        remoteFormatSupported = false
     }
 
     @Synchronized
@@ -126,11 +129,31 @@ class AaAudioPlayer(
                 c.queueInputBuffer(inIndex, 0, aacFrame.size, 0, 0)
             }
             var outIndex = c.dequeueOutputBuffer(bufferInfo, 0)
+            if (outIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
+                val actual = c.outputFormat
+                remoteFormatSupported = actual.getInteger(MediaFormat.KEY_SAMPLE_RATE) == 48000 &&
+                    actual.getInteger(MediaFormat.KEY_CHANNEL_COUNT) == 2 &&
+                    (!actual.containsKey(MediaFormat.KEY_PCM_ENCODING) ||
+                        actual.getInteger(MediaFormat.KEY_PCM_ENCODING) == AudioFormat.ENCODING_PCM_16BIT)
+                outIndex = c.dequeueOutputBuffer(bufferInfo, 0)
+            }
             while (outIndex >= 0) {
                 val out = c.getOutputBuffer(outIndex)
                 if (out != null && bufferInfo.size > 0) {
                     val pcm = ByteArray(bufferInfo.size)
+                    out.position(bufferInfo.offset)
+                    out.limit(bufferInfo.offset + bufferInfo.size)
                     out.get(pcm)
+                    if (remoteFormatSupported && remotePcm(pcm)) {
+                        if (trackStarted) {
+                            t.pause()
+                            t.flush()
+                            trackStarted = false
+                        }
+                        c.releaseOutputBuffer(outIndex, false)
+                        outIndex = c.dequeueOutputBuffer(bufferInfo, 0)
+                        continue
+                    }
                     // Lazy start: the first real PCM is the signal there's
                     // actually something to play. Starting at setCodecConfig()
                     // time instead left the track spinning empty -- see there.

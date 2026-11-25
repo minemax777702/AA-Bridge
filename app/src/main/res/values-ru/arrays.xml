@@ -31,6 +31,7 @@
         <item>Bluetooth при подключении, иначе телефон</item>
         <item>Всегда микрофон и динамик телефона</item>
         <item>Телефон воспроизводит музыку и подсказки (Bluetooth или динамик телефона)</item>
+        <item>Звук через CarbitLink (экспериментально, с резервным выводом)</item>
     </string-array>
 
     <string-array name="usb_role_entries">

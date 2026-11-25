@@ -183,6 +183,28 @@ class AaSessionProbe(
 
     @Volatile private var pcmPlayer: AaPcmPlayer? = null
 
+    @Volatile private var carbitAudio: dev.caraalink.link.CarbitAudioTransport? = null
+
+    @Synchronized
+    internal fun attachCarbitAudio(audio: dev.caraalink.link.CarbitAudioTransport?) {
+        if (carbitAudio === audio) return
+        carbitAudio?.stopPlayback()
+        carbitAudio = audio
+    }
+
+    @Synchronized
+    internal fun detachCarbitAudio(audio: dev.caraalink.link.CarbitAudioTransport) {
+        if (carbitAudio === audio) attachCarbitAudio(null)
+    }
+
+    private fun sendRemotePcm(pcm: ByteArray): Boolean {
+        if (config.preview || !running.get() ||
+            dev.caraalink.settings.AppSettings.aaAudioRoute(context) !=
+            dev.caraalink.settings.AppSettings.AaAudioRoute.CARBIT_EXPERIMENTAL
+        ) return false
+        return carbitAudio?.playMusic(pcm) == true
+    }
+
     // AVMediaAckIndication (0x8004) flow control, confirmed from
     // mrmees/open-android-auto's protocol docs (GPL-3.0, paraphrased facts
     // only -- field numbers/names, not their prose): every MEDIA_SETUP
@@ -674,7 +696,8 @@ class AaSessionProbe(
                                 // whatever was already playing and never resuming it,
                                 // since music doesn't resend its own config afterward.
                                 val player = audioPlayer
-                                    ?: AaAudioPlayer(context, sampleRate = 48_000, channelCount = 2, preview = config.preview).also { audioPlayer = it }
+                                    ?: AaAudioPlayer(context, sampleRate = 48_000, channelCount = 2,
+                                        preview = config.preview, remotePcm = ::sendRemotePcm).also { audioPlayer = it }
                                 audioExecutor.execute { player.setCodecConfig(chBody) }
                             }
                         } else if (chBody.size > 8) {
@@ -687,6 +710,10 @@ class AaSessionProbe(
                         // root cause of "no music, ever" (not a routing or
                         // AudioTrack-timing bug after all).
                         sendAvAck(channel, message.channelId)
+                    } else if (chId == AaFraming.MSG_MEDIA_STOP &&
+                        message.channelId == AaServiceDiscovery.CHANNEL_MEDIA_SINK_MEDIA_AUDIO
+                    ) {
+                        audioExecutor.execute { carbitAudio?.stopPlayback() }
                     } else if (chId == AaFraming.MSG_MEDIA_VIDEO_FOCUS_REQUEST) {
                         // NATIVE(2) is the driver's Exit (as openauto reads it) unless the reason is PHONE_SCREEN_OFF(1). Phones
                         // also send one at startup, so it only counts once video has arrived on this connection.
@@ -819,6 +846,7 @@ class AaSessionProbe(
             micCapture = null
             audioPlayer?.stop()
             audioPlayer = null
+            carbitAudio?.stopPlayback()
             pcmPlayer?.stop()
             pcmPlayer = null
             runCatching { socket?.close() }
