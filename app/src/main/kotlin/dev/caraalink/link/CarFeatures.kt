@@ -24,13 +24,13 @@ import org.json.JSONObject
 class CarFeatures(private val context: Context) {
 
     @Volatile private var last: Location? = null
-    @Volatile private var gpsSpeed: PhoneGpsSpeed.Sample? = null
+    @Volatile private var gpsFix: Pair<Location, PhoneGpsSpeed.Sample>? = null
     private val listener = LocationListener { location ->
         if (!started) return@LocationListener
         last = location
         if (location.provider == LocationManager.GPS_PROVIDER) {
             val sample = if (AppSettings.phoneGpsSpeed(context)) PhoneGpsSpeed.fromLocation(location, SystemClock.elapsedRealtimeNanos()) else null
-            gpsSpeed = sample
+            gpsFix = sample?.let { Location(location) to it }
             ConnectionStateHolder.update { it.copy(phoneGpsSpeedMps = sample?.metersPerSecond,
                 phoneGpsSpeedElapsedNanos = sample?.elapsedNanos ?: 0L) }
         }
@@ -43,7 +43,7 @@ class CarFeatures(private val context: Context) {
         started = true
         try {
             lm.getProviders(true).forEach { p ->
-                lm.getLastKnownLocation(p)?.let { if (last == null || it.time > last!!.time) last = it }
+                lm.getLastKnownLocation(p)?.let { if (it.time > (last?.time ?: Long.MIN_VALUE)) last = it }
                 lm.requestLocationUpdates(p, 1000L, 0f, listener, Looper.getMainLooper())
             }
         } catch (_: SecurityException) {
@@ -55,7 +55,7 @@ class CarFeatures(private val context: Context) {
         if (!started) return
         started = false
         runCatching { context.getSystemService(LocationManager::class.java).removeUpdates(listener) }
-        gpsSpeed = null
+        gpsFix = null
         last = null
         ConnectionStateHolder.update { it.copy(phoneGpsSpeedMps = null, phoneGpsSpeedElapsedNanos = 0L) }
     }
@@ -67,11 +67,10 @@ class CarFeatures(private val context: Context) {
     }
 
     private fun gps(): JSONObject {
-        val loc = last ?: return JSONObject().put("status", false)
-        val speed = if (AppSettings.phoneGpsSpeed(context)) {
-            gpsSpeed?.takeIf { it.freshAt(SystemClock.elapsedRealtimeNanos()) }?.metersPerSecond
-                ?: return JSONObject().put("status", false)
-        } else if (loc.hasSpeed()) loc.speed else null
+        val gpsEnabled = AppSettings.phoneGpsSpeed(context)
+        val fix = if (gpsEnabled) gpsFix?.takeIf { it.second.freshAt(SystemClock.elapsedRealtimeNanos()) } else null
+        val loc = (if (gpsEnabled) fix?.first else last) ?: return JSONObject().put("status", false)
+        val speed = if (gpsEnabled) fix?.second?.metersPerSecond else if (loc.hasSpeed()) loc.speed else null
         return JSONObject()
             .put("status", true)
             .put("longitude", loc.longitude)

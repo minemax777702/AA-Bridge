@@ -292,11 +292,12 @@ class UsbLinkForegroundService : Service() {
      * Android 14 refuses a microphone-typed start from the background (transport reconnects run there),
      * so fall back to connectedDevice alone rather than failing the session.
      */
-    private fun startForegroundWithMic(wireless: Boolean = false) {
+    private fun startForegroundWithMic(wireless: Boolean = false, allowPhoneGps: Boolean = true) {
         val notification = buildNotification(ConnectionStateHolder.snapshot)
         val micGranted = checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED
         // Wi-Fi Direct scans count as location access up to Android 12, so a reconnect mid-drive needs this type.
-        val location = if (wireless && needsLocationForWifiDirect() && hasFineLocation()) ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION else 0
+        val requiredLocation = if (wireless && needsLocationForWifiDirect() && hasFineLocation()) ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION else 0
+        val location = if (allowPhoneGps && AppSettings.phoneGpsSpeed(this) && hasFineLocation()) ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION else requiredLocation
         // The microphone type only exists from Android 11; on 10 it's an undeclared type and throws.
         if (micGranted && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             try {
@@ -309,7 +310,13 @@ class UsbLinkForegroundService : Service() {
             }
         }
         phoneLog.log("service started without microphone (permission=$micGranted)")
-        startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE or location)
+        try {
+            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE or location)
+        } catch (e: SecurityException) {
+            if (location == requiredLocation) throw e
+            phoneLog.log("GPS foreground access unavailable; continuing without optional location type")
+            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE or requiredLocation)
+        }
     }
 
     private fun needsLocationForWifiDirect() = Build.VERSION.SDK_INT <= Build.VERSION_CODES.S_V2
@@ -322,7 +329,7 @@ class UsbLinkForegroundService : Service() {
         if (!dev.caraalink.BuildConfig.DEBUG || session != null || wirelessLink != null ||
             pendingAccessory != null || ConnectionStateHolder.snapshot.link != CarLink.NONE) return
         try {
-            startForegroundWithMic()
+            startForegroundWithMic(allowPhoneGps = false)
         } catch (e: SecurityException) {
             phoneLog.log("LAN debug foreground start refused: $e")
             stopSelf()
