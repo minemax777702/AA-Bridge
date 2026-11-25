@@ -28,7 +28,7 @@ import dev.caraalink.R
 import dev.caraalink.settings.AppSettings
 import dev.caraalink.connection.CarLink
 import dev.caraalink.connection.WirelessPhase
-import dev.caraalink.diagnostics.AdbHandshakeProbe
+import dev.caraalink.diagnostics.LegacyUsbDiagnostics
 import dev.caraalink.diagnostics.DiagnosticLogger
 import dev.caraalink.link.QdTransport
 import dev.caraalink.link.SocketTransport
@@ -39,24 +39,19 @@ import dev.caraalink.wireless.RememberedCar
 import dev.caraalink.wireless.WirelessLink
 import dev.caraalink.wireless.findCar
 import java.net.InetAddress
-import dev.caraalink.diagnostics.UsbSnifferDiagnostic
 
 /**
  * Keeps the USB link alive while the app is backgrounded (screen off is
  * expected and fine — see claude/roadmap.md; this does NOT force the screen
  * on, only holds a partial wake lock so the CPU doesn't doze mid-read).
- * Currently only drives [UsbSnifferDiagnostic]; swap in the real protocol
- * once Phase 3 lands.
  */
 class UsbLinkForegroundService : Service() {
 
     private val handler = Handler(Looper.getMainLooper())
     private var wakeLock: PowerManager.WakeLock? = null
-    private var sniffer: UsbSnifferDiagnostic? = null
-    private var adbProbe: AdbHandshakeProbe? = null
+    private val legacyDiagnostics by lazy { LegacyUsbDiagnostics(this) }
     private var session: CarSession? = null
     private var pendingAccessory: UsbAccessory? = null
-    private var resumeActiveMode: ((UsbAccessory) -> Unit)? = null
     private var detachStopRunnable: Runnable? = null
     // Confirmed from real logs (chatgpt-status.md "EIO" findings): the
     // Mirror transport dies with "read failed: EIO" after sustained use,
@@ -142,8 +137,8 @@ class UsbLinkForegroundService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.i(TAG, "onStartCommand: action=${intent?.action}")
         when (intent?.action) {
-            ACTION_START_SNIFFER -> handleStart(intent) { accessory -> beginSniffing(accessory) }
-            ACTION_START_ADB_PROBE -> handleStart(intent) { accessory -> beginAdbProbe(accessory) }
+            ACTION_START_SNIFFER -> if (dev.caraalink.BuildConfig.DEBUG) handleStart(intent) { legacyDiagnostics.startSniffer(it) } else stopSelf()
+            ACTION_START_ADB_PROBE -> if (dev.caraalink.BuildConfig.DEBUG) handleStart(intent) { legacyDiagnostics.startProbe(it) } else stopSelf()
             ACTION_START_SESSION -> {
                 handleStart(intent) { accessory -> beginSession(accessory) }
             }
@@ -202,26 +197,6 @@ class UsbLinkForegroundService : Service() {
         }
     }
 
-    private fun beginSniffing(accessory: UsbAccessory) {
-        Log.i(TAG, "beginSniffing: ${accessory.manufacturer}/${accessory.model}")
-        adbProbe?.stop()
-        sniffer?.stop()
-        val s = UsbSnifferDiagnostic(this)
-        sniffer = s
-        resumeActiveMode = ::beginSniffing
-        s.start(accessory)
-    }
-
-    private fun beginAdbProbe(accessory: UsbAccessory) {
-        Log.i(TAG, "beginAdbProbe: ${accessory.manufacturer}/${accessory.model}")
-        sniffer?.stop()
-        adbProbe?.stop()
-        val p = AdbHandshakeProbe(this)
-        adbProbe = p
-        resumeActiveMode = ::beginAdbProbe
-        p.start(accessory)
-    }
-
     private fun beginSession(accessory: UsbAccessory) {
         // Stop a wireless session while link is still WIRELESS, so its ERROR can't stop the service.
         // It keeps Android Auto running, and the cable session attaches to it (openAndroidAuto).
@@ -231,8 +206,7 @@ class UsbLinkForegroundService : Service() {
         }
         ConnectionStateHolder.update { it.copy(link = CarLink.CABLE, wireless = WirelessPhase.IDLE, suggestion = null) }
         Log.i(TAG, "beginSession: ${accessory.manufacturer}/${accessory.model}")
-        sniffer?.stop()
-        adbProbe?.stop()
+        legacyDiagnostics.stop()
         session?.stop()
         lateinit var s: CarSession
         s = CarSession(this, accessory) { reason ->
@@ -279,8 +253,7 @@ class UsbLinkForegroundService : Service() {
         detachStopRunnable = null
         runCatching { unregisterReceiver(detachReceiver) }
         runCatching { unregisterReceiver(screenReceiver) }
-        sniffer?.stop()
-        adbProbe?.stop()
+        legacyDiagnostics.stop()
         releaseWakeLock()
         super.onDestroy()
     }
@@ -575,9 +548,7 @@ class UsbLinkForegroundService : Service() {
             val active = it.wireless == WirelessPhase.SEARCHING || it.wireless == WirelessPhase.CONNECTING || it.wireless == WirelessPhase.RECONNECTING
             it.copy(link = CarLink.NONE, wireless = if (active) WirelessPhase.IDLE else it.wireless)
         }
-        sniffer?.stop()
-        adbProbe?.stop()
-        adbProbe = null
+        legacyDiagnostics.stop()
         releaseWakeLock()
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
