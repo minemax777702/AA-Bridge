@@ -40,7 +40,7 @@ Record only authorized sessions. Full payloads may contain screen/video, voice, 
 
 The selected session limit and a 512 MiB storage reserve are enforced; the asynchronous writer queue is bounded to 16 MiB / 16384 records. On capacity or I/O failure capture stops and is marked incomplete rather than silently sampling. A process kill may leave an unfinalized manifest and truncated tail. A clean user stop proves completeness only for bytes observed at instrumented calls during that interval, not for all physical bus packets, firmware/CAN internals or data sent by other apps. TCP reads/writes are chunks, not network packets; USB AOA streams do not include low-level USB setup transactions. TX records represent successful write calls, not confirmed delivery.
 
-Export ZIP: `manifest.json`, `traffic.bin`. Export ordinary diagnostic logs separately for decoded context. Decode on PC:
+Export ZIP: `manifest.json`, `capabilities.json`, `traffic.bin`. Export ordinary diagnostic logs separately for decoded context. Decode on PC:
 
 ```sh
 python tools/decode_hu_dump.py AA-HU-....zip extracted
@@ -49,4 +49,23 @@ python -m unittest discover -s tools -p "test_decode_hu_dump.py"
 
 Outputs per-stream RX/TX binary files, `timeline.jsonl` with offsets and manual marks, and `summary.json`. The decoder exits 2 for incomplete/unverified captures but retains readable records. Binary format (big endian): ASCII AHUDUMP1, int64 epoch milliseconds, then records int64 sequence, int64 elapsed nanoseconds, uint8 direction (1 RX, 2 TX, 3 marker, 4 metadata), int32 UTF-8 stream name length, int32 payload length, stream name bytes and payload. Capture timestamps are taken after the I/O call returns, not at the bus.
 
-Not included: original CarbitLink application's simultaneous USB traffic, Bluetooth HCI, Wi-Fi management frames, internal CAN traffic, Android Auto localhost TLS connection, or hardware signals the HU does not publish. Those require different capture points or authorized external equipment. USB ownership is exclusive.
+Not included: original CarbitLink application's simultaneous USB traffic, Bluetooth HCI, Wi-Fi management frames, internal CAN traffic, hardware signals the HU does not publish. Those require different capture points or authorized external equipment. USB ownership is exclusive.
+
+## Capability survey and comparison
+
+Start full RAW, then choose the guided scenario "Фоновый обмен" first. Run each subsequent test separately, repeat when safe, and mark the observed result. Use the normal Android Auto functions for active checks, including audio, microphone, focus and connection heartbeat. No new guessed vehicle commands, arbitrary command sender, brute force, or vehicle actuation are provided. Existing GPS command 0x10430 is a request for phone GPS, NOT a vehicle sensor feed.
+
+The live survey inventories packet IDs, directions, counts, lengths, sampled non-media payload hashes and declared PXC/QDLink/mirror fields. Each scenario records a result, duration, changes vs idle and candidate byte offsets in bounded aligned prefixes of parsed RX control messages. Offsets are hypotheses: time counters, traffic variability, and prefix truncation may explain them. No unsupported classification is inferred from silence. A user-observed result is separate from protocol evidence. For best coverage repeat the same scenario in independent captures.
+
+The RAW dump also contains a distinct android-auto-local stream (wire framing including TLS records, not decrypted media) and AA-local message metadata. This is phone-side evidence and cannot establish what the actual HU supports. Wi-Fi Direct discovery and mDNS metadata are recorded from existing discovery callbacks; no new external network requests. RAW now includes more traffic and may reach its storage limit sooner.
+
+The report is bounded (2048 packet kinds, 256 declared fields, 200 completed tests, 100 candidates per test). It is a companion to RAW, not exhaustive; if RAW stops automatically the survey snapshot may include nearby events after the RAW cutoff. Keep individual captures short and stop explicitly. Export a full dump for the capabilities file; ordinary text logs are separate.
+
+On PC:
+
+```sh
+python tools/analyze_hu_capabilities.py capture1.zip capture2.zip -o report.json
+python -m unittest discover -s tools -p "test_*hu*.py"
+```
+
+The analyzer distinguishes user-observed working functions, advertised fields, observed known commands and unknown candidates. It highlights candidates that recur in multiple captures. Run the raw decoder separately to check completeness. It does not assign unknown vehicle signals or decode proprietary firmware automatically.
