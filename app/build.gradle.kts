@@ -25,6 +25,7 @@ android {
         targetSdk = 34
         versionCode = 8
         versionName = "1.4.0"
+        buildConfigField("boolean", "HU_DIAGNOSTICS", "false")
         buildConfigField("String", "GIT_SHA", "\"${gitSha()}\"")
     }
 
@@ -43,6 +44,13 @@ android {
     }
 
     buildTypes {
+        create("diagnostics") {
+            initWith(getByName("debug"))
+            applicationIdSuffix = ".diagnostics"
+            versionNameSuffix = "-diagnostics"
+            matchingFallbacks += listOf("debug")
+            buildConfigField("boolean", "HU_DIAGNOSTICS", "true")
+        }
         release {
             isMinifyEnabled = false
             signingConfig = signingConfigs.findByName("release")
