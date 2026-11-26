@@ -3,5 +3,6 @@
     xmlns:tools="http://schemas.android.com/tools">
     <application android:label="AA-Bridge Diagnostics" tools:replace="android:label">
         <activity android:name=".diagnostics.HuDiagnosticsActivity" android:exported="false" />
+        <activity android:name=".diagnostics.HuWizardActivity" android:exported="false" />
     </application>
 </manifest>
