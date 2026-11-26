@@ -66,6 +66,8 @@ class AaTlsChannel(
         val plain = ByteArray(2 + body.size)
         AaFraming.putU16(plain, 0, messageId)
         body.copyInto(plain, 2)
+        if (dev.caraalink.diagnostics.HuCapture.active) dev.caraalink.diagnostics.HuCapture.record(
+            "AA-local", "TX_BUILT", "$channelId/$messageId", length = body.size)
         val cipher = wrap(plain)
         val frame = AaFraming.frame(channelId, AaFraming.FRAME_BULK, AaFraming.ENCRYPTION_ENCRYPTED, messageType, cipher)
         // One ack per video/audio frame is dozens of lines a second; failures are still logged by the caller.
@@ -138,7 +140,10 @@ class AaTlsChannel(
             if (frames > 512) error("message did not terminate after $frames frames")
         }
 
-        return Message(channelId, messageType, acc.toByteArray(), frames)
+        val payload = acc.toByteArray()
+        if (dev.caraalink.diagnostics.HuCapture.active) dev.caraalink.diagnostics.HuCapture.record(
+            "AA-local", "RX", "$channelId/${AaFraming.controlMessageId(payload)}", length = payload.size)
+        return Message(channelId, messageType, payload, frames)
     }
 
     /**

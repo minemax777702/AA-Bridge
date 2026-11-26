@@ -284,6 +284,7 @@ class QdTransport(
     }
 
     private fun sendJson(msgType: Int, text: String, log: Boolean = true) {
+        if (dev.caraalink.diagnostics.HuCapture.active) dev.caraalink.diagnostics.HuCapture.record("QDLink", "TX_BUILT", "json-$msgType", text.toByteArray(Charsets.UTF_8))
         if (log) logger.log("QD TX: $text")
         send(QdFrames.json(msgType, text))
     }
@@ -358,6 +359,7 @@ class QdTransport(
     }
 
     private fun onFrame(msgType: Int, payloadFormat: Int, payload: ByteArray) {
+        if (dev.caraalink.diagnostics.HuCapture.active) dev.caraalink.diagnostics.HuCapture.record("QDLink", "RX", "frame-$msgType", if (payloadFormat == QdFrames.FORMAT_JSON) payload else null, payload.size, "format=$payloadFormat")
         json = true
         when {
             payloadFormat == QdFrames.FORMAT_JSON -> {
@@ -374,6 +376,13 @@ class QdTransport(
 
     private fun onCommand(msg: JSONObject) {
         val para = msg.optJSONObject("PARA") ?: JSONObject()
+        if (dev.caraalink.BuildConfig.HU_DIAGNOSTICS) dev.caraalink.diagnostics.HuLiveData.qd(host, msg.optString("CMD").ifBlank { "unknown" }, para)
+        if (dev.caraalink.diagnostics.HuCapture.active) {
+            val id = msg.optString("CMD").ifBlank { "unknown" }
+            dev.caraalink.diagnostics.HuCapture.record("QDLink-command", "RX", id, details = para.toString())
+            if (id in setOf("CAR_INFO", "VIDEO_ARGS", "SPEECH_ARGS", "VIDEO_SUP_REQ"))
+                dev.caraalink.diagnostics.HuSurvey.advertised("QDLink.$id", para)
+        }
         when (msg.optString("CMD")) {
             "HEARTBEAT" -> if (!carInfo) resendAppStatus()
             "CAR_INFO" -> {
@@ -425,6 +434,13 @@ class QdTransport(
         val action = bb.getInt(28)
         val cmd = bb.getInt(68)
         val value = bb.getInt(72)
+        if (dev.caraalink.diagnostics.HuCapture.active) {
+            val control = type == QdBin.TYPE_CMD || type == QdBin.TYPE_SCREEN ||
+                type == QdBin.TYPE_HU || type == QdBin.TYPE_TOUCH
+            dev.caraalink.diagnostics.HuCapture.record("QDLink", "RX", "legacy-bin",
+                if (control) b else null, b.size + extra.size,
+                "type=$type action=$action cmd=$cmd value=$value")
+        }
         when {
             type == QdBin.TYPE_CMD && action == 1 && cmd == QdBin.CMD_HEARTBEAT -> {
                 if (binHeartbeats++ < 2) logger.log("QD RX !BIN heartbeat value=$value")
@@ -527,6 +543,7 @@ class QdTransport(
 
     private fun onHuMsg(p: ByteArray) {
         val logic = QdBin.logicId(p)
+        if (dev.caraalink.diagnostics.HuCapture.active) dev.caraalink.diagnostics.HuCapture.record("QDLink-A6A6", "RX", logic ?: "unknown", p)
         if (logic != "heartbeat") logger.log("QD RX A6A6: ${String(p)}")
         when (logic) {
             "HUINFO" -> {

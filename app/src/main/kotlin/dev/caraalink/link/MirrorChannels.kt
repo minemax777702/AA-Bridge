@@ -111,6 +111,7 @@ class MirrorControlChannel(
     private val logger: DiagnosticLogger,
     private val host: MirrorHost,
     private val context: android.content.Context? = null,
+    private val liveOwner: Any? = null,
 ) : AdbTransport.StreamHandler {
 
     private val framers = HashMap<Int, ReqFramer>()
@@ -130,6 +131,8 @@ class MirrorControlChannel(
     }
 
     private fun handle(stream: MirrorStream, type: Int, body: ByteArray) {
+        if (dev.caraalink.BuildConfig.HU_DIAGNOSTICS) dev.caraalink.diagnostics.HuLiveData.mirror(liveOwner, type, body)
+        if (dev.caraalink.diagnostics.HuCapture.active) dev.caraalink.diagnostics.HuCapture.record("mirror-control", "RX", "0x" + type.toString(16), body)
         // Protocol sniffer (Settings > Debug > "Verbose protocol logging"):
         // normally heartbeat/screen-event are too frequent to log, but when
         // the sniffer is on, log every message with a hex preview.

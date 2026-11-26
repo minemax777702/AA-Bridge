@@ -63,6 +63,7 @@ class CarSession(
             logger.log("openAccessory() returned null")
             return false
         }
+        dev.caraalink.diagnostics.HuLiveData.begin(this)
         logger.log("Opened accessory ${accessory.manufacturer}/${accessory.model}")
         ConnectionStateHolder.update {
             it.copy(phase = ConnectionPhase.ATTACHED, accessoryManufacturer = accessory.manufacturer,
@@ -79,19 +80,39 @@ class CarSession(
 
     /** The same channels over the car's Wi-Fi Direct TCP connections; the car shows up on its first CLIENT_INFO. */
     fun startWireless() {
+        dev.caraalink.diagnostics.HuLiveData.begin(this)
         features.start()
         transport = SocketTransport(logger, channels(), ::onTransportClosed).also { it.start() }
     }
 
     private fun channels(): (String) -> AdbTransport.StreamHandler? {
-        val pxc = PxcChannel(logger, { info -> onClientInfo(info) }, features::replyBody).also { this.pxc = it }
-        val ctrl = MirrorControlChannel(logger, this, context)
+        val pxc = PxcChannel(logger, { info -> onClientInfo(info) }, features::replyBody, liveOwner = this).also { this.pxc = it }
+        val ctrl = MirrorControlChannel(logger, this, context, liveOwner = this)
         val data = MirrorDataChannel(logger, this)
+        val instrument = if (dev.caraalink.BuildConfig.HU_DIAGNOSTICS) InstrumentChannel(this).also { it.listenerStatus("waiting") } else null
+        val tracedCtrl = if (dev.caraalink.BuildConfig.HU_DIAGNOSTICS) {
+            object : AdbTransport.StreamHandler {
+                override fun onOpen(stream: MirrorStream) {
+                    dev.caraalink.diagnostics.HuCapture.record("mirror-control", "RX", "open", details = "stream=${stream.localId}")
+                    ctrl.onOpen(stream)
+                }
+                override fun onData(stream: MirrorStream, data: ByteArray) {
+                    dev.caraalink.diagnostics.HuCapture.record("mirror-control", "RX", "chunk", data,
+                        details = "stream=${stream.localId}")
+                    ctrl.onData(stream, data)
+                }
+                override fun onClose(stream: MirrorStream) {
+                    dev.caraalink.diagnostics.HuCapture.record("mirror-control", "RX", "close", details = "stream=${stream.localId}")
+                    ctrl.onClose(stream)
+                }
+            }
+        } else ctrl
         return { service ->
             when (service) {
                 "tcp:10922" -> pxc
-                "tcp:10921" -> ctrl
+                "tcp:10921" -> tracedCtrl
                 "tcp:10920" -> data
+                "tcp:10926" -> instrument
                 else -> null
             }
         }
@@ -109,6 +130,7 @@ class CarSession(
     }
 
     private fun release() {
+        dev.caraalink.diagnostics.HuLiveData.end(this)
         released = true
         aaWatchdog.removeCallbacksAndMessages(null)
         pollThread?.interrupt()
@@ -131,6 +153,7 @@ class CarSession(
     }
 
     private fun onClientInfo(info: JSONObject) {
+        if (dev.caraalink.diagnostics.HuCapture.active) dev.caraalink.diagnostics.HuCapture.record("PXC", "RX", "client-info", details = info.toString())
         logger.log("Head unit: ${info.optString("HUName")} screenType=${info.optInt("screenType")} " +
             "mirror=${info.optBoolean("supportScreenMirroring")} touch=${info.optBoolean("supportScreenTouch")}")
         ConnectionStateHolder.update {
@@ -394,6 +417,15 @@ class CarSession(
     // --- MirrorHost ---
 
     override fun onCaptureConfig(config: CaptureConfig) {
+        if (dev.caraalink.BuildConfig.HU_DIAGNOSTICS) dev.caraalink.diagnostics.HuLiveData.config(this, org.json.JSONObject()
+            .put("width", config.width).put("height", config.height).put("fps", config.wantFps)
+            .put("encoder", config.wantEncoder).put("bitrate", config.bitRate).put("orientation", config.orientation)
+            .put("displayId", config.displayId).put("extendedProtocol", config.supportExtendProtocol))
+        if (dev.caraalink.diagnostics.HuCapture.active) dev.caraalink.diagnostics.HuCapture.record("mirror", "RX", "capture-config", details = config.toString())
+        if (dev.caraalink.diagnostics.HuCapture.active) dev.caraalink.diagnostics.HuSurvey.advertised("mirror.capture", org.json.JSONObject()
+            .put("width", config.width).put("height", config.height).put("fps", config.wantFps)
+            .put("encoder", config.wantEncoder).put("bitrate", config.bitRate).put("orientation", config.orientation)
+            .put("displayId", config.displayId).put("extendedProtocol", config.supportExtendProtocol))
         val previous = this.config
         this.config = config
         CarScreenInfo.update(config.width, config.height)
@@ -447,11 +479,15 @@ class CarSession(
     override fun onTouch(action: Int, x: Int, y: Int) = onTouch(action, x, y, 0)
 
     override fun onTouch(action: Int, x: Int, y: Int, slot: Int) {
+        if (dev.caraalink.diagnostics.HuCapture.active) dev.caraalink.diagnostics.HuCapture.record("mirror", "RX", "touch", details = "action=$action x=$x y=$y slot=$slot")
         val c = config ?: return
         val enc = encoder ?: return
         // Car coordinates are in its own screen size; the encoder may be a few pixels smaller.
         val fx = x * enc.width.toFloat() / c.width
         val fy = y * enc.height.toFloat() / c.height
+        if (dev.caraalink.diagnostics.RawHuDump.active) dev.caraalink.diagnostics.RawHuDump.meta(
+            "gesture/hu-input", org.json.JSONObject().put("action", action).put("slot", slot)
+                .put("x", x).put("y", y).put("mappedX", fx.toDouble()).put("mappedY", fy.toDouble()).toString())
         display.touch(action, fx, fy, slot)
     }
 
@@ -460,6 +496,8 @@ class CarSession(
     }
 
     override fun onKey(key: Int) {
+        dev.caraalink.diagnostics.HuLiveData.key(this, key)
+        if (dev.caraalink.diagnostics.HuCapture.active) dev.caraalink.diagnostics.HuCapture.record("mirror", "RX", "key", details = "key=$key")
         logger.log("car key $key")
         if (key == MirrorControlChannel.KEY_HOME || key == MirrorControlChannel.KEY_BACK) closeAa()
     }

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <application android:label="AA-Bridge Diagnostics" tools:replace="android:label">
+        <activity android:name=".diagnostics.HuDiagnosticsActivity" android:exported="false" />
+        <activity android:name=".diagnostics.HuWizardActivity" android:exported="false" />
+        <activity android:name=".diagnostics.HuLiveActivity" android:exported="false" />
+    </application>
+</manifest>

@@ -1,6 +1,8 @@
 package dev.caraalink.link
 
 import android.os.Process
+import dev.caraalink.BuildConfig
+import dev.caraalink.diagnostics.RawHuDump
 import dev.caraalink.diagnostics.DiagnosticLogger
 import java.io.IOException
 import java.net.InetSocketAddress
@@ -35,14 +37,17 @@ class SocketTransport(
 
     fun start() {
         if (!running.compareAndSet(false, true)) return
-        for (port in PORTS) {
+        val ports = if (BuildConfig.HU_DIAGNOSTICS) PORTS + InstrumentWire.PORT else PORTS
+        for (port in ports) {
             val server = try {
                 ServerSocket().apply { reuseAddress = true; bind(InetSocketAddress(port)) }
             } catch (e: IOException) {
                 logger.log("listen on $port failed: ${e.message}")
+                if (port == InstrumentWire.PORT) (handlerFor("tcp:$port") as? InstrumentChannel)?.listenerStatus("listen-failed")
                 continue
             }
             servers += server
+            if (port == InstrumentWire.PORT) (handlerFor("tcp:$port") as? InstrumentChannel)?.listenerStatus("listening")
             thread(name = "SocketTransport-accept-$port", isDaemon = true) { acceptLoop(server, port) }
         }
         listening = servers.isNotEmpty()
@@ -67,10 +72,14 @@ class SocketTransport(
                 runCatching { socket.close() }
                 continue
             }
+            if (port == InstrumentWire.PORT && streams.count { it.socket.localPort == port } >= 4) {
+                runCatching { socket.close() }; continue
+            }
+            if (port == InstrumentWire.PORT) socket.soTimeout = 15000
             socket.tcpNoDelay = true
             val handler = handlerFor("tcp:$port")
             logger.log("car connected to tcp:$port from ${socket.remoteSocketAddress}")
-            accepted++
+            if (port != InstrumentWire.PORT) accepted++
             if (handler == null) {
                 runCatching { socket.close() }
                 continue
@@ -94,6 +103,7 @@ class SocketTransport(
             while (true) {
                 val n = input.read(buf)
                 if (n < 0) break
+                stream.traceId?.let { RawHuDump.record(it, RawHuDump.RX, buf, 0, n) }
                 if (reads++ < 2) logger.logBytes("RX tcp:$port", buf, n)
                 synchronized(dispatch) { handler.onData(stream, buf.copyOf(n)) }
             }
@@ -108,6 +118,8 @@ class SocketTransport(
     }
 
     inner class SocketStream(override val localId: Int, val socket: Socket) : MirrorStream {
+        val traceId = if (BuildConfig.HU_DIAGNOSTICS) RawHuDump.streamId("wifi-tcp/${socket.localPort}") else null
+        init { traceId?.let { RawHuDump.meta(it, "open local=${socket.localSocketAddress} remote=${socket.remoteSocketAddress}") } }
         private val queue = LinkedBlockingQueue<Queued>()
         @Volatile override var closed = false
             private set
@@ -117,7 +129,9 @@ class SocketTransport(
             try {
                 val out = socket.getOutputStream()
                 while (!closed) {
-                    out.write(queue.take().bytes)
+                    val bytes = queue.take().bytes
+                    out.write(bytes)
+                    traceId?.let { RawHuDump.record(it, RawHuDump.TX, bytes) }
                 }
             } catch (_: InterruptedException) {
             } catch (e: IOException) {
@@ -138,6 +152,7 @@ class SocketTransport(
         fun close() {
             if (closed) return
             closed = true
+            traceId?.let { RawHuDump.meta(it, "close") }
             writer.interrupt()
             runCatching { socket.close() }
         }

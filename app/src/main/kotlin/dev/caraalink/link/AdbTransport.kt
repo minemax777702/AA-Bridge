@@ -194,6 +194,7 @@ class AdbTransport(
     }
 
     private fun handlePacket(cmd: Int, arg0: Int, arg1: Int, payload: ByteArray) {
+        dev.caraalink.diagnostics.HuCapture.adb("RX", cmd, arg0, arg1, payload.size)
         when (cmd) {
             CMD_CNXN -> {
                 // Values per libjadbd TransportBase::handleConn (claude/roadmap.md).
@@ -245,6 +246,7 @@ class AdbTransport(
     }
 
     private fun sendPacket(cmd: Int, arg0: Int, arg1: Int, payload: ByteArray) {
+        dev.caraalink.diagnostics.HuCapture.adb("TX_BUILT", cmd, arg0, arg1, payload.size)
         val header = ByteBuffer.allocate(24).order(ByteOrder.LITTLE_ENDIAN)
             .putInt(cmd).putInt(arg0).putInt(arg1).putInt(payload.size)
             .putInt(payload.sumOf { it.toInt() and 0xFF })

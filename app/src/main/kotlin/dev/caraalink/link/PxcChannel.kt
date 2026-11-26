@@ -19,6 +19,7 @@ class PxcChannel(
     private val onClientInfo: (JSONObject) -> Unit,
     /** Body for the reply to a car request, or null for an empty ack. */
     private val replyBody: (cmd: Int) -> ByteArray? = { null },
+    private val liveOwner: Any? = null,
 ) : AdbTransport.StreamHandler {
 
     private val buffers = HashMap<Int, ByteArray>()
@@ -34,9 +35,12 @@ class PxcChannel(
         val channel = channelOf.remove(stream.localId)
         if (channel == P2C_CHANNEL && p2cStream === stream) {
             p2cStream = null
+            dev.caraalink.diagnostics.HuAudioProbe.detach(carbitAudio)
             stopHeartbeat(stream)
             carbitAudio.reset()
         } else if (channel == 0x10000) {
+            dev.caraalink.diagnostics.HuAudioProbe.detach(carbitAudio)
+            carbitAudio.endDiagnosticProbe()
             carbitAudio.stopMic()
             carbitAudio.stopPlayback()
             carbitAudio.reset()
@@ -108,6 +112,8 @@ class PxcChannel(
     }
 
     private fun handle(stream: MirrorStream, cmd: Int, extra: Int, body: ByteArray) {
+        dev.caraalink.diagnostics.HuCapture.pxc("RX", cmd, extra, body, stream.localId)
+        if (dev.caraalink.BuildConfig.HU_DIAGNOSTICS) dev.caraalink.diagnostics.HuLiveData.pxc(liveOwner, cmd, body, channelOf[stream.localId] == P2C_CHANNEL)
         if (channelOf[stream.localId] == null) {
             channelOf[stream.localId] = cmd
             logger.log("PXC channel open 0x${hex(cmd)} on stream ${stream.localId}")
@@ -115,6 +121,7 @@ class PxcChannel(
             if (cmd == P2C_CHANNEL) {
                 if (p2cStream != null && p2cStream !== stream) carbitAudio.reset()
                 p2cStream = stream
+                dev.caraalink.diagnostics.HuAudioProbe.attach(carbitAudio)
                 startHeartbeat(stream)
             }
             return
@@ -125,6 +132,7 @@ class PxcChannel(
             if (cmd != HEARTBEAT + 1) logger.log("PXC P2C reply 0x${hex(cmd)} len=${body.size}" + preview(body))
             return
         }
+        if (dev.caraalink.diagnostics.HuCapture.active) dev.caraalink.diagnostics.HuSurvey.controlJson(cmd, body)
         if (cmd == CarbitAudioTransport.MIC_DATA) {
             stream.write(head(CarbitAudioTransport.MIC_DATA_ACK, ByteArray(0), extra))
             carbitAudio.onMicData(body)
@@ -137,6 +145,7 @@ class PxcChannel(
             cmd == CLIENT_INFO -> {
                 runCatching {
                     val info = JSONObject(String(body, Charsets.UTF_8))
+                    dev.caraalink.diagnostics.HuSurvey.advertised("PXC.CLIENT_INFO", info)
                     carbitAudio.updateMicAllowed(info.opt("supportMic") == true)
                     onClientInfo(info)
                 }.onFailure { carbitAudio.updateMicAllowed(false) }
@@ -145,6 +154,7 @@ class PxcChannel(
             cmd == CarbitAudioTransport.CAPABILITIES -> {
                 val allowed = runCatching {
                     val info = JSONObject(String(body, Charsets.UTF_8))
+                    dev.caraalink.diagnostics.HuSurvey.advertised("PXC.AUDIO_CAPABILITIES", info)
                     CarbitAudioTransport.Stream.entries.filter {
                         info.opt(it.name.lowercase(java.util.Locale.ROOT)) == true
                     }.toSet()
@@ -169,6 +179,7 @@ class PxcChannel(
         .toString().toByteArray(Charsets.UTF_8)
 
     private fun head(cmd: Int, body: ByteArray, extra: Int): ByteArray {
+        dev.caraalink.diagnostics.HuCapture.pxc("TX_BUILT", cmd, extra, body)
         val total = 16 + body.size
         return ByteBuffer.allocate(total).order(ByteOrder.LITTLE_ENDIAN)
             .putInt(cmd).putInt(total).putInt(cmd xor total).putInt(extra).put(body).array()

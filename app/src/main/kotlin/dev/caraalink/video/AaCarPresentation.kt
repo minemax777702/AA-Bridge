@@ -91,7 +91,20 @@ class AaCarPresentation(
                 MotionEvent.ACTION_CANCEL -> ev.actionMasked
                 MotionEvent.ACTION_MOVE -> {
                     val now = android.os.SystemClock.uptimeMillis()
-                    if (now - lastMoveAt < 30) return@setOnTouchListener true
+                    // In the opt-in A/B rotation test only, retain both per-slot updates.
+                    // The ordinary 30 ms filter may discard the second finger's move.
+                    val fullRate = ev.pointerCount > 1 &&
+                        dev.caraalink.BuildConfig.HU_DIAGNOSTICS &&
+                        dev.caraalink.diagnostics.RawHuDump.active &&
+                        dev.caraalink.diagnostics.HuSurvey.isScenarioActive("map_rotate_full")
+                    if (!fullRate && now - lastMoveAt < 30) {
+                        if (dev.caraalink.BuildConfig.HU_DIAGNOSTICS &&
+                            dev.caraalink.diagnostics.RawHuDump.active && ev.pointerCount > 1) {
+                            dev.caraalink.diagnostics.RawHuDump.meta("gesture/aa-input-filtered",
+                                "move pointerCount=${ev.pointerCount}")
+                        }
+                        return@setOnTouchListener true
+                    }
                     lastMoveAt = now
                     MotionEvent.ACTION_MOVE
                 }

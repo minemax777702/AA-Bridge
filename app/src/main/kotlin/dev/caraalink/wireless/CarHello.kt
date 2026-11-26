@@ -42,9 +42,19 @@ object CarHello {
             return s.use {
                 runCatching {
                     it.soTimeout = 5000
-                    it.getOutputStream().write(packet)
-                    val reply = ByteArray(4096)
-                    answerCommand(reply, it.getInputStream().read(reply)) == ANSWER
+                    val id = if (dev.caraalink.BuildConfig.HU_DIAGNOSTICS)
+                        dev.caraalink.diagnostics.RawHuDump.streamId("wifi-hello/$port") else null
+                    id?.let { dev.caraalink.diagnostics.RawHuDump.meta(it, "open") }
+                    try {
+                        it.getOutputStream().write(packet)
+                        id?.let { dev.caraalink.diagnostics.RawHuDump.record(it, dev.caraalink.diagnostics.RawHuDump.TX, packet) }
+                        val reply = ByteArray(4096)
+                        val n = it.getInputStream().read(reply)
+                        id?.let { dev.caraalink.diagnostics.RawHuDump.record(it, dev.caraalink.diagnostics.RawHuDump.RX, reply, 0, n) }
+                        answerCommand(reply, n) == ANSWER
+                    } finally {
+                        id?.let { dev.caraalink.diagnostics.RawHuDump.meta(it, "close") }
+                    }
                 }.getOrDefault(false)
             }
         }

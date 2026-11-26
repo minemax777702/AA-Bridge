@@ -76,6 +76,11 @@ fun SettingsScreen(onBack: () -> Unit, onHelp: () -> Unit, onAbout: () -> Unit) 
     SubScreen(stringResource(R.string.settings), onBack) {
         WirelessCarRow()
         DashGroup {
+            if (dev.caraalink.BuildConfig.HU_DIAGNOSTICS) {
+                SettingsRow(painterResource(R.drawable.ic_tune), "Диагностика ГУ и автомобиля") {
+                    context.startActivity(Intent(context, dev.caraalink.diagnostics.HuDiagnosticsActivity::class.java))
+                }
+            }
             SettingsRow(painterResource(R.drawable.ic_help), stringResource(R.string.help), onClick = onHelp)
             SettingsRow(rememberVectorPainter(Icons.Rounded.Info), stringResource(R.string.settings_about), onClick = onAbout)
             SettingsRow(painterResource(R.drawable.ic_tune), stringResource(R.string.settings_advanced)) {

@@ -41,6 +41,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (BuildConfig.HU_DIAGNOSTICS && savedInstanceState == null && intent?.action == Intent.ACTION_MAIN) {
+            startActivity(Intent(this, dev.caraalink.diagnostics.HuDiagnosticsActivity::class.java))
+        }
         // The app is always dark, so the system bar icons stay light even in the phone's light mode.
         enableEdgeToEdge(
             androidx.activity.SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
