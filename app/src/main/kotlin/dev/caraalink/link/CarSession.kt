@@ -394,6 +394,7 @@ class CarSession(
     // --- MirrorHost ---
 
     override fun onCaptureConfig(config: CaptureConfig) {
+        if (dev.caraalink.diagnostics.HuCapture.active) dev.caraalink.diagnostics.HuCapture.record("mirror", "RX", "capture-config", details = config.toString())
         val previous = this.config
         this.config = config
         CarScreenInfo.update(config.width, config.height)
@@ -447,6 +448,7 @@ class CarSession(
     override fun onTouch(action: Int, x: Int, y: Int) = onTouch(action, x, y, 0)
 
     override fun onTouch(action: Int, x: Int, y: Int, slot: Int) {
+        if (dev.caraalink.diagnostics.HuCapture.active) dev.caraalink.diagnostics.HuCapture.record("mirror", "RX", "touch", details = "action=$action x=$x y=$y slot=$slot")
         val c = config ?: return
         val enc = encoder ?: return
         // Car coordinates are in its own screen size; the encoder may be a few pixels smaller.
@@ -460,6 +462,7 @@ class CarSession(
     }
 
     override fun onKey(key: Int) {
+        if (dev.caraalink.diagnostics.HuCapture.active) dev.caraalink.diagnostics.HuCapture.record("mirror", "RX", "key", details = "key=$key")
         logger.log("car key $key")
         if (key == MirrorControlChannel.KEY_HOME || key == MirrorControlChannel.KEY_BACK) closeAa()
     }
