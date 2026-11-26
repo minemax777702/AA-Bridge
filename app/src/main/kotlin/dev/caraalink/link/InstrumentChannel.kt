@@ -6,14 +6,16 @@ import dev.caraalink.diagnostics.RawHuDump
 import org.json.JSONObject
 
 /** Receive-only vehicle diagnostics. Sends only SDK-confirmed session/config/heartbeat ACKs.
- * No unsolicited queries, CAN injection, or vehicle control.
+ * Also maintains the SDK-confirmed P2C heartbeat. No vehicle queries or control.
  */
 internal class InstrumentChannel(private val owner: Any) : AdbTransport.StreamHandler {
     private class State {
         val outer = InstrumentWire.Framer()
         val mcu = InstrumentWire.McuFramer()
         var channel: Int? = null
-        var rejected = false
+        @Volatile var rejected = false
+        @Volatile var heartbeatAck = false
+        var heartbeat: Thread? = null
     }
     private val states = HashMap<Int, State>()
     fun listenerStatus(status: String) { HuLiveData.instrumentLink(owner, status) }
@@ -25,7 +27,9 @@ internal class InstrumentChannel(private val owner: Any) : AdbTransport.StreamHa
     }
 
     override fun onClose(stream: MirrorStream) {
-        states.remove(stream.localId) ?: return
+        val state = states.remove(stream.localId) ?: return
+        state.rejected = true
+        state.heartbeat?.interrupt()
         HuLiveData.instrumentLink(owner, if (states.values.any { it.channel == InstrumentWire.C2P && !it.rejected })
             "receiving" else if (states.isEmpty()) "closed" else "waiting")
         RawHuDump.meta("instrument", "close stream=${stream.localId}")
@@ -39,6 +43,7 @@ internal class InstrumentChannel(private val owner: Any) : AdbTransport.StreamHa
         }
         if (state.outer.failed) {
             state.rejected = true
+            state.heartbeat?.interrupt()
             HuLiveData.instrumentLink(owner, "invalid-header")
             RawHuDump.meta("instrument", "invalid outer header stream=${stream.localId}")
         }
@@ -59,6 +64,11 @@ internal class InstrumentChannel(private val owner: Any) : AdbTransport.StreamHa
             state.channel = cmd
             reply(stream, InstrumentWire.encode(cmd + 1))
             HuLiveData.instrumentLink(owner, if (cmd == InstrumentWire.C2P) "channel-open" else "p2c-connected")
+            if (cmd == InstrumentWire.P2C) startHeartbeat(stream, state)
+            return
+        }
+        if (state.channel == InstrumentWire.P2C) {
+            if (cmd == InstrumentWire.HEARTBEAT + 1 && frame.body.isEmpty()) state.heartbeatAck = true
             return
         }
         if (state.channel != InstrumentWire.C2P) return
@@ -91,6 +101,29 @@ internal class InstrumentChannel(private val owner: Any) : AdbTransport.StreamHa
             InstrumentWire.HEARTBEAT -> if (frame.body.isEmpty()) reply(stream, InstrumentWire.encode(cmd + 1, frame.extra))
         }
     }
+    private fun startHeartbeat(stream: MirrorStream, state: State) {
+        state.heartbeat = Thread({
+            try {
+                while (!stream.closed && !state.rejected) {
+                    state.heartbeatAck = false
+                    reply(stream, InstrumentWire.encode(InstrumentWire.HEARTBEAT))
+                    // SDK P2CService waits for the reply, then sleeps about two seconds.
+                    val deadline = android.os.SystemClock.elapsedRealtime() + 5000
+                    while (!stream.closed && !state.rejected && !state.heartbeatAck &&
+                        android.os.SystemClock.elapsedRealtime() < deadline) Thread.sleep(50)
+                    if (stream.closed || state.rejected) break
+                    HuLiveData.instrumentFields(owner, "heartbeat",
+                        JSONObject().put("p2cAck", state.heartbeatAck))
+                    if (!state.heartbeatAck) break // no unbounded writes when peer is silent
+                    Thread.sleep(2000)
+                }
+            } catch (_: InterruptedException) {
+            } catch (e: Exception) {
+                RawHuDump.meta("instrument", "heartbeat failed: ${e.javaClass.simpleName}")
+            }
+        }, "Instrument-heartbeat").apply { isDaemon = true; start() }
+    }
+
     private fun reply(stream: MirrorStream, bytes: ByteArray) {
         if (stream.closed) return
         stream.write(bytes)
