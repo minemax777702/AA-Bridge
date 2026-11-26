@@ -31,6 +31,54 @@ internal class CarbitAudioTransport(
     private val stopping = linkedSetOf<Stream>()
     private var pending: Pending? = null
     private var playbackFailed = false
+    // One opt-in diagnostic request at a time. Never changes advertised capabilities.
+    private var probe: Stream? = null
+    private var probePhase = "idle"
+    private var probeDeadline = 0L
+
+    @Synchronized fun beginDiagnosticProbe(stream: Stream): Boolean {
+        expireRequests()
+        if (probe != null || playbackFailed || pending != null || active.isNotEmpty() ||
+            stopping.isNotEmpty() || micState != MicState.IDLE) return false
+        probe = stream
+        probePhase = "starting"
+        probeDeadline = nowMs() + ACK_TIMEOUT_MS
+        if (!send(START, stream.startBody())) {
+            probe = null; probePhase = "send-failed"
+            return false
+        }
+        return true
+    }
+
+    @Synchronized fun diagnosticStatus(): String {
+        if (probe != null && probePhase in listOf("starting", "stopping") && nowMs() >= probeDeadline) {
+            val stream = probe!!
+            if (probePhase == "starting") send(STOP, stream.stopBody())
+            probe = null
+            probePhase = "timeout-reconnect"
+            playbackFailed = true // Late ACK cannot be correlated safely.
+        }
+        return probePhase
+    }
+
+    @Synchronized fun diagnosticFrame(pcm: ByteArray): Boolean {
+        val stream = probe ?: return false
+        if (diagnosticStatus() != "active" || pcm.isEmpty() || pcm.size > MAX_PCM_BYTES ||
+            pcm.size % (stream.channels * 2) != 0) return false
+        return send(stream.command, pcm)
+    }
+
+    @Synchronized fun endDiagnosticProbe() {
+        val stream = probe ?: return
+        if (probePhase == "stopping") return
+        val wasStarting = probePhase == "starting"
+        probePhase = "stopping"
+        probeDeadline = nowMs() + ACK_TIMEOUT_MS
+        if (!send(STOP, stream.stopBody()) || wasStarting) {
+            probe = null; probePhase = "cancelled-reconnect"; playbackFailed = true
+        }
+    }
+
     private var micAllowed = false
     private var micState = MicState.IDLE
     private var micDeadline = 0L
@@ -58,7 +106,7 @@ internal class CarbitAudioTransport(
     @Synchronized
     fun startStream(stream: Stream) {
         expireRequests()
-        if (playbackFailed || stream !in allowed || stream in active || stream in stopping ||
+        if (probe != null || playbackFailed || stream !in allowed || stream in active || stream in stopping ||
             pending != null || micState == MicState.STARTING || micState == MicState.STOPPING) return
         pending = Pending(stream, true, nowMs() + ACK_TIMEOUT_MS)
         if (!send(START, stream.startBody())) pending = null
@@ -66,7 +114,7 @@ internal class CarbitAudioTransport(
 
     @Synchronized
     fun play(stream: Stream, pcm: ByteArray): Boolean {
-        if (stream !in allowed || pcm.isEmpty() || pcm.size > MAX_PCM_BYTES ||
+        if (probe != null || stream !in allowed || pcm.isEmpty() || pcm.size > MAX_PCM_BYTES ||
             pcm.size % (stream.channels * 2) != 0) return false
         expireRequests()
         if (playbackFailed || stream in stopping) return false
@@ -85,6 +133,13 @@ internal class CarbitAudioTransport(
     @Synchronized
     fun onReply(command: Int) {
         expireRequests()
+        if (probe != null && command in listOf(START_ACK, STOP_ACK)) {
+            if (diagnosticStatus() == "starting" && command == START_ACK) probePhase = "active"
+            else if (probePhase == "stopping" && command == STOP_ACK) {
+                probe = null; probePhase = "stopped"
+            }
+            return
+        }
         when (command) {
             START_ACK, STOP_ACK -> {
                 val request = pending ?: return
@@ -138,7 +193,7 @@ internal class CarbitAudioTransport(
     @Synchronized
     fun requestMic(): Boolean {
         expireRequests()
-        if (!micAllowed || micState != MicState.IDLE || pending != null) return false
+        if (probe != null || !micAllowed || micState != MicState.IDLE || pending != null) return false
         micFrames.clear()
         micState = MicState.STARTING
         micDeadline = nowMs() + ACK_TIMEOUT_MS
@@ -184,6 +239,8 @@ internal class CarbitAudioTransport(
 
     @Synchronized
     fun reset() {
+        probe = null
+        probePhase = "disconnected"
         allowed = emptySet()
         active.clear()
         stopping.clear()
