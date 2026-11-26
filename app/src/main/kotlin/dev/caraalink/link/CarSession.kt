@@ -413,6 +413,10 @@ class CarSession(
 
     override fun onCaptureConfig(config: CaptureConfig) {
         if (dev.caraalink.diagnostics.HuCapture.active) dev.caraalink.diagnostics.HuCapture.record("mirror", "RX", "capture-config", details = config.toString())
+        if (dev.caraalink.diagnostics.HuCapture.active) dev.caraalink.diagnostics.HuSurvey.advertised("mirror.capture", org.json.JSONObject()
+            .put("width", config.width).put("height", config.height).put("fps", config.wantFps)
+            .put("encoder", config.wantEncoder).put("bitrate", config.bitRate).put("orientation", config.orientation)
+            .put("displayId", config.displayId).put("extendedProtocol", config.supportExtendProtocol))
         val previous = this.config
         this.config = config
         CarScreenInfo.update(config.width, config.height)
