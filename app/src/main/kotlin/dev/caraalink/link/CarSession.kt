@@ -71,7 +71,7 @@ class CarSession(
         }
         features.start()
         transport = if (accessory.manufacturer == QdTransport.MANUFACTURER) {
-            QdTransport(conn, logger, this, ::onTransportClosed, liveOwner = this).also { it.start() }
+            QdTransport(conn, logger, this, ::onTransportClosed).also { it.start() }
         } else {
             AdbTransport(conn, logger, channels(), ::onTransportClosed).also { it.start() }
         }
