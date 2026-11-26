@@ -33,12 +33,25 @@ object HuSurvey {
         Scenario("climate", "Климат", "Измените штатную настройку климата и верните её."),
         Scenario("ignition", "Зажигание", "При безопасной стоянке наблюдайте штатное включение/выключение ГУ."),
         Scenario("reconnect", "Переподключение", "Отключите и повторно подключите телефон обычным способом."),
-        Scenario("wireless", "Wi-Fi Direct", "Проверьте штатное беспроводное подключение отдельно от USB.")
+        Scenario("wireless", "Wi-Fi Direct", "Проверьте штатное беспроводное подключение отдельно от USB."),
+        Scenario("drive_mode", "Режим Eco / Sport / Comfort", "Только наблюдение штатного режима на стоянке. Если изменение разрешено руководством и безопасно, используйте штатное меню, не приложение. Не запускайте двигатель ради теста."),
+        Scenario("cluster_light", "Подсветка приборной панели", "На стоянке измените яркость штатным регулятором, верните исходное значение."),
+        Scenario("headlights", "Габариты / фары", "На стоянке наблюдайте штатное изменение освещения; не отключайте необходимое освещение."),
+        Scenario("climate_temp", "Температура климата", "Измените температуру на один шаг и верните исходное значение."),
+        Scenario("climate_fan", "Скорость вентилятора", "Измените штатную скорость вентилятора на один шаг и верните."),
+        Scenario("climate_ac", "Кондиционер / рециркуляция", "Проверьте штатную индикацию кондиционера и рециркуляции."),
+        Scenario("native_voice", "Штатный голосовой помощник", "Если доступен, вызовите штатного помощника и отмените его без команды управления автомобилем."),
+        Scenario("native_radio", "Штатный источник радио", "Переключите штатное радио и вернитесь в CarbitLink."),
+        Scenario("cluster_nav", "Навигация на приборной панели", "На стоянке проверьте, появляются ли навигационные подсказки на приборной панели."),
+        Scenario("media_keys", "Клавиши следующего / предыдущего трека", "На стоянке проверьте каждую клавишу отдельно."),
+        Scenario("native_exit", "Выход из CarbitLink и возврат", "Откройте штатные настройки ГУ и вернитесь в CarbitLink, не отключая запись.")
     )
     private data class Stats(var count: Long = 0, var min: Int = Int.MAX_VALUE, var max: Int = 0,
         val samples: MutableSet<String> = linkedSetOf())
     private val packets = linkedMapOf<String, Stats>()
     private val fields = linkedMapOf<String, String>()
+    private val controlJson = linkedMapOf<String, String>()
+    private var controlBytes = 0
     private val results = JSONArray()
     private var running = false
     private var overflow = 0L
@@ -53,7 +66,7 @@ object HuSurvey {
 
     @Synchronized fun start() {
         if (!BuildConfig.HU_DIAGNOSTICS) return
-        packets.clear(); fields.clear()
+        packets.clear(); fields.clear(); controlJson.clear(); controlBytes = 0
         while (results.length() > 0) results.remove(results.length() - 1)
         current = null; before = emptyMap(); baseline = emptyMap()
         windowSamples.clear(); idleSamples = emptyMap()
@@ -86,6 +99,30 @@ object HuSurvey {
                 }
             }
         }
+    }
+
+    /** Capture entire bounded JSON messages, including large voice catalogs; not executable. */
+    @Synchronized fun controlJson(cmd: Int, body: ByteArray) {
+        if (!running || body.size !in 2..(64 * 1024)) return
+        val value = String(body, Charsets.UTF_8).trim()
+        if (!value.startsWith("{") || !value.endsWith("}")) return
+        val json = runCatching { JSONObject(value) }.getOrNull() ?: return
+        val id = "0x" + cmd.toUInt().toString(16).padStart(8, '0')
+        val previous = controlJson[id]
+        if (previous == value) return
+        val cost = value.toByteArray(Charsets.UTF_8).size
+        val oldCost = previous?.toByteArray(Charsets.UTF_8)?.size ?: 0
+        if ((id !in controlJson && controlJson.size >= 128) || controlBytes - oldCost + cost > 512 * 1024) return
+        controlBytes += cost - oldCost
+        controlJson[id] = value
+        RawHuDump.meta("survey/pxc-json/$id", value)
+        val source = when (cmd) {
+            0x10200 -> "PXC.NIGHT"
+            0x10040 -> "PXC.NAVIGATION"
+            0x10690 -> "PXC.LINK"
+            else -> null
+        }
+        if (source != null) advertised(source, json)
     }
 
     @Synchronized fun advertised(source: String, json: JSONObject) {
@@ -163,6 +200,7 @@ object HuSurvey {
     @Synchronized fun report(): JSONObject = JSONObject()
         .put("schema", 1).put("distinctPacketTypes", packets.size).put("untrackedEvents", overflow)
         .put("advertisedFields", JSONObject().apply { fields.forEach { (key, value) -> put(key, value) } })
+        .put("pxcJson", JSONObject().apply { controlJson.forEach { (key, value) -> put(key, JSONObject(value)) } })
         .put("packets", JSONArray().apply {
             packets.forEach { (key, stats) ->
                 put(JSONObject().put("id", key).put("count", stats.count)
