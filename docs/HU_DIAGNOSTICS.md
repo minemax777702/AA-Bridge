@@ -103,3 +103,22 @@ Open Diagnostics → Параметры ГУ в реальном времени 
 The other tabs show bounded JSON field paths, packet counts and last receipt, and recent changes with timestamp, source, old/new values and byte offsets for unknown binary messages. Mark an action to correlate it with packet changes. The last 2,000 changes are kept in process memory across reconnects; current fields reset on a new connection. Export JSON before closing the app. Unchanged repeat messages update receipt time but do not create field changes. Binary comparison uses aligned offsets (not inferred signal encoding), only up to 4096-byte bodies, with a limited diff preview. Media bodies and common mirror touch/heartbeat traffic are not interpreted as telemetry.
 
 For a complete session export full RAW separately. The ZIP includes live-parameters.json (snapshot taken at finalization, bounded in-memory history may include earlier connections) and live/change metadata for changes observed during the RAW capture. The original traffic remains authoritative; snapshot may extend beyond an automatic capture cutoff. No new network requests, vehicle commands or CAN access are introduced.
+
+
+## Emgrand SS11 — experimental Instrument receiver
+
+Actual vehicle: Geely Emgrand IV (SS11), 2024 Comfort, 8-inch HU, 6AT, firmware 4.55_20240401. CLIENT_INFO reports EC-RJ-2401 and carModel SX11; the latter is not reliable vehicle identification.
+
+Evidence: supplied CarbitLink 6.5.1 APK and 6.6.2 build 576 XAPK, arm64 libEPSDK.so identical (SHA256 5b22221ca165d0116440349afd2bb758feeabb017a8059b6c904f9a761ebbb03). No vendor code/binaries stored in this repo.
+- CMPServer constructor 0x1c425c: TCP port 10926.
+- CMPServer::handlePXCClient 0x1c4aa0: initial 16-byte header, empty reply cmd+1, extra=0.
+- MIServer::makePXCService 0x1c8158: 0x01060000 C2P, 0x01070000 P2C.
+- C2PMInstService::handleCMD 0x1c9794: config 0x01060010, MXC 0x01060020, overspeed configuration 0x01060040. Config ACK 0x01060011 echoes extra and has 20-byte NUL-padded ASCII 1.0.0. C2P heartbeat ACK echoes extra; P2C heartLoop at 0x1c3c7c sends 0x70000000 and waits for 0x70000001 before repeating.
+- EPMInst::parseMXCBaseInfo 0x1c4ea4 forwards bodies to mcu_parser 0x1c680c. Nested sync 53 CA, little-endian length plus 4 (normal frames), type at offset 4, CRC16 polynomial 0x1021 seed 0, little-endian CRC at end. CRC checked before decode. Kotlin receiver bounds outer frames to 64 KiB and nested frames to 4096 bytes.
+- Type 1: speed, gear, RPM, temperatures, fuel, 44 light indicators and their validity flags, drive mode, backlight, ignition. Type 2: odometer, trip, range and selected trip metrics. Enum IDs cross-checked against classes3.dex EPMInstDataEnum. All numeric fields are SDK raw values (temperature offsets from native parser applied); units/scales and gear/drive-mode enums are not confirmed on SS11. Flag=0 means unavailable, not zero. Synthetic test fixtures are not real vehicle data.
+- PXC 0x10460 reversing 4112/4113: original Java handler net.easyconn.carman.ec.b$b.n in classes7.dex pauses/resumes music on these codes respectively. Bluetooth/drivingMode remain raw codes; the latter is an application mode, not confirmed Eco/Sport/Comfort.
+- Tyre parser exists (0x1c4f04), but no verified dispatch in C2PMInstService; no invented tyre mapping. Door, actual climate, parking sensors and CAN remain unconfirmed.
+
+Diagnostics build only: SocketTransport listens on 10926 in addition to normal ports, accepts only existing Wi-Fi Direct interface policy, caps Instrument sockets to four and uses 15s read timeout. USB handler accepts a peer-opened tcp:10926 ADB stream experimentally (not verified that HU opens it). No scans or outbound connections. Only known handshake/config/heartbeat messages are sent; no vehicle commands. An Instrument disconnect does not stop the main projection. No capability spoofing or active MI discovery command is claimed.
+
+Open live parameters after connecting; check Instrument 10926 status. Start full RAW before connection if exporting a complete experiment. Live JSON includes raw values, validity, timestamps and last nonempty previous session if reconnect occurred. The table flags Instrument readings older than 10 seconds or without active telemetry as stale. If there is no Instrument connection, the feature is still unconfirmed on this firmware. No original dump or identifiers published.
