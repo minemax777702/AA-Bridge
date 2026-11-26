@@ -16,6 +16,7 @@ internal class InstrumentChannel(private val owner: Any) : AdbTransport.StreamHa
         var rejected = false
     }
     private val states = HashMap<Int, State>()
+    fun listenerStatus(status: String) { HuLiveData.instrumentLink(owner, status) }
     override fun onOpen(stream: MirrorStream) {
         if (states.size >= 4) return
         states[stream.localId] = State()
@@ -57,7 +58,7 @@ internal class InstrumentChannel(private val owner: Any) : AdbTransport.StreamHa
             }
             state.channel = cmd
             reply(stream, InstrumentWire.encode(cmd + 1))
-            HuLiveData.instrumentLink(owner, if (cmd == InstrumentWire.C2P) "receiving" else "p2c-connected")
+            HuLiveData.instrumentLink(owner, if (cmd == InstrumentWire.C2P) "channel-open" else "p2c-connected")
             return
         }
         if (state.channel != InstrumentWire.C2P) return
