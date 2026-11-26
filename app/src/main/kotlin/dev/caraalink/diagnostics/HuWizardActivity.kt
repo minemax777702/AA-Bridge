@@ -19,14 +19,22 @@ import org.json.JSONObject
 /** One question at a time. All tests use the existing capture and connection. */
 class HuWizardActivity : Activity() {
     private val handler = Handler(Looper.getMainLooper())
-    private val ids = listOf("idle", "audio_phone", "audio_bt", "audio_pxc_music", "audio_pxc_tts",
-        "audio_pxc_vr", "audio_pxc_talkie", "display", "touch", "map_zoom", "map_rotate", "map_rotate_full",
-        "wheel", "media_keys", "navigation", "voice", "volume", "focus", "night",
-        "cluster_light", "headlights", "drive_mode", "climate_temp", "climate_fan", "climate_ac",
-        "doors", "native_voice", "native_radio", "cluster_nav", "native_exit", "gps",
-        "parking", "gear", "sensors", "ignition", "heartbeat", "reconnect", "wireless")
+    private val ids = listOf(
+        "idle", "inventory", "voice_catalog", "nav_info", "audio_phone", "audio_bt", "audio_pxc_music",
+        "audio_pxc_tts", "audio_pxc_vr", "audio_pxc_talkie", "mic_phone", "mic_bt", "mic_pxc", "display",
+        "display_fit", "display_resume", "touch", "touch_tap", "touch_swipe", "touch_long", "map_zoom",
+        "map_rotate", "map_rotate_full", "map_tilt", "music", "navigation", "voice", "call",
+        "wheel", "media_keys", "key_next", "key_prev", "key_play", "key_voice", "key_back",
+        "volume", "volume_up", "volume_down", "volume_mute", "focus", "bt_controls", "night",
+        "night_on", "night_off", "cluster_light", "headlights", "drive_mode", "climate", "climate_temp",
+        "climate_fan", "climate_ac", "defog", "doors", "windows", "sunroof", "native_voice",
+        "native_radio", "native_apps", "cluster_nav", "native_exit", "gps", "time_sync", "parking",
+        "gear", "sensors", "vehicle_speed", "engine_rpm", "engine_temp", "fuel", "tire_pressure",
+        "ignition", "heartbeat", "link_usb", "reconnect", "wireless"
+    )
     private var index = 0
     private var opened = false
+    private var vehicleState = "unknown"
     private var stage = "ready"
     private var evidence = JSONObject()
     private var summary = mutableListOf<String>()
@@ -60,6 +68,7 @@ class HuWizardActivity : Activity() {
         if (savedInstanceState != null) {
             index = savedInstanceState.getInt("index")
             opened = savedInstanceState.getBoolean("opened")
+            vehicleState = savedInstanceState.getString("vehicleState") ?: "unknown"
             stage = savedInstanceState.getString("stage") ?: "ready"
             evidence = runCatching { JSONObject(savedInstanceState.getString("evidence") ?: "{}") }.getOrDefault(JSONObject())
             summary = savedInstanceState.getStringArrayList("summary") ?: mutableListOf()
@@ -72,6 +81,7 @@ class HuWizardActivity : Activity() {
         super.onSaveInstanceState(outState)
         outState.putInt("index", index)
         outState.putBoolean("opened", opened)
+        outState.putString("vehicleState", vehicleState)
         outState.putString("stage", stage)
         outState.putString("evidence", evidence.toString())
         outState.putStringArrayList("summary", ArrayList(summary))
@@ -129,10 +139,22 @@ class HuWizardActivity : Activity() {
             return
         }
         text("Шаг ${index + 1} из ${ids.size}")
+        val states = listOf("unknown", "ACC", "ON", "engine-running")
+        val labels = arrayOf("Не указано", "ACC", "Зажигание ON", "Двигатель работает")
+        button("Состояние авто: " + labels[states.indexOf(vehicleState).coerceAtLeast(0)]) {
+            android.app.AlertDialog.Builder(this).setTitle("Фактическое состояние автомобиля")
+                .setItems(labels) { _, i ->
+                    vehicleState = states[i]
+                    RawHuDump.mark("VEHICLE_STATE:$vehicleState")
+                    render()
+                }.show()
+        }
         text(test.title, 22f)
         text(test.instructions)
         val audio = test.id.startsWith("audio_")
         val timed = test.id in listOf("idle", "heartbeat")
+        val mic = test.id.startsWith("mic_")
+        val inventory = test.id in listOf("inventory", "voice_catalog", "nav_info")
         when (stage) {
             "ready" -> {
                 if (audio) {
@@ -141,6 +163,11 @@ class HuWizardActivity : Activity() {
                     button("Настройки Bluetooth") { startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS)) }
                     if (test.id.startsWith("audio_pxc_") && !HuAudioProbe.available)
                         text("PXC не готов. После тайм-аута переподключите ГУ; при отсутствии канала пропустите тест.")
+                }
+                if (mic) {
+                    text("Запись до 3 секунд. Произнесите короткую фразу, не содержащую личных данных.")
+                    if (test.id != "mic_pxc" && checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) != android.content.pm.PackageManager.PERMISSION_GRANTED)
+                        button("Разрешить микрофон") { requestPermissions(arrayOf(android.Manifest.permission.RECORD_AUDIO), 641) }
                 }
                 button(if (audio) "Воспроизвести сигнал" else "Начать проверку") { startStep() }
                 button("Пропустить") { skip() }
@@ -156,9 +183,16 @@ class HuWizardActivity : Activity() {
                     if (test.id.startsWith("audio_pxc_") && !verified)
                         text("При тайм-ауте переподключите ГУ перед следующей проверкой.")
                     text("Технический результат: " + evidence.optString("status", "—"))
+                } else if (mic) {
+                    text("Технический результат: " + evidence.optString("status"))
+                    text("Получено отсчётов: " + evidence.optLong("samples") + "; пик: " + evidence.optInt("peak"))
+                    text("Произнесли фразу во время теста?", 19f)
+                } else if (inventory) {
+                    text("Результат автоматического обнаружения: " + evidence.optString("status"))
+                    text("Типов пакетов: " + evidence.optInt("packetTypeCount"))
                 } else text(question(test.id), 19f)
-                button("Да") { answer("yes") }
-                button("Нет") { answer("no") }
+                if (inventory) button("Далее") { answer("auto") }
+                else { button("Да") { answer("yes") }; button("Нет") { answer("no") } }
                 button("Не уверен / не удалось проверить") { answer("uncertain") }
                 button("Повторить") {
                     if (opened) HuSurvey.finish("inconclusive", evidence.put("status", "repeated"))
@@ -197,6 +231,8 @@ class HuWizardActivity : Activity() {
             if (outputs.isNotEmpty()) return false
         }
         if (id.startsWith("audio_pxc_")) return HuAudioProbe.available
+        if (id == "mic_pxc") return HuAudioProbe.available && checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        if (id.startsWith("mic_")) return checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED
         if (id in listOf("idle", "heartbeat") && ConnectionStateHolder.snapshot.phase !in
             listOf(ConnectionPhase.ATTACHED, ConnectionPhase.STREAMING)) return false
         return true
@@ -213,17 +249,30 @@ class HuWizardActivity : Activity() {
             return
         }
         opened = true
-        evidence = JSONObject().put("mode", "guided").put("connectionBefore", ConnectionStateHolder.snapshot.phase.name)
+        evidence = JSONObject().put("mode", "guided").put("vehicleStateBefore", vehicleState).put("connectionBefore", ConnectionStateHolder.snapshot.phase.name)
         val token = ++generation
         val keepGoing = { visible && generation == token && RawHuDump.active }
         fun complete(result: JSONObject) {
             runOnUiThread {
                 if (isDestroyed || generation != token || !opened) return@runOnUiThread
+                evidence.keys().forEach { key -> if (!result.has(key)) result.put(key, evidence.opt(key)) }
                 evidence = result.put("mode", "guided").put("connectionAfter", ConnectionStateHolder.snapshot.phase.name)
                 stage = "answer"; render()
             }
         }
         when {
+            test.id in listOf("inventory", "voice_catalog", "nav_info") -> {
+                complete(HuSurvey.inventory(test.id))
+            }
+            test.id == "mic_pxc" -> {
+                stage = "running"; render()
+                if (!HuAudioProbe.runMic(keepGoing) { result -> complete(result) })
+                    complete(JSONObject().put("status", "not-started"))
+            }
+            test.id in listOf("mic_phone", "mic_bt") -> {
+                stage = "running"; render()
+                Thread({ complete(HuLocalMicTest.run(applicationContext, test.id == "mic_bt", keepGoing)) }, "HuLocalMicTest").start()
+            }
             test.id == "idle" || test.id == "heartbeat" -> {
                 stage = "running"; render()
                 handler.postDelayed({ if (generation == token) complete(JSONObject().put("status", "observed-30s")) }, 30_000)
@@ -256,13 +305,15 @@ class HuWizardActivity : Activity() {
         val result = when {
             value == "skip" -> "not-tested"
             value == "uncertain" -> "inconclusive"
+            value == "auto" -> "inconclusive" // advertised evidence never proves operation
+            test.id.startsWith("mic_") -> "inconclusive" // signal metrics are not speech intelligibility
             test.id.startsWith("audio_pxc_") && !evidence.optBoolean("signalQueued") -> "inconclusive"
             test.id in listOf("audio_phone", "audio_bt") &&
                 (evidence.optString("status") != "played" || !evidence.optBoolean("routeVerified")) -> "inconclusive"
             value == "yes" -> "works"
             else -> "failed"
         }
-        evidence.put("userAnswer", value).put("connectionAfter", ConnectionStateHolder.snapshot.phase.name)
+        evidence.put("userAnswer", value).put("vehicleStateAfter", vehicleState).put("connectionAfter", ConnectionStateHolder.snapshot.phase.name)
         HuSurvey.finish(result, evidence)
         summary.add("${test.title}: " + when (result) {
             "works" -> "Да"; "failed" -> "Нет"; "not-tested" -> "Пропущено"; else -> "Не подтверждено"
@@ -272,6 +323,6 @@ class HuWizardActivity : Activity() {
         // Open the next observation window automatically; only safe audio/timed steps run code.
         // Bluetooth changes and manual vehicle actions always require a user action.
         val next = id
-        if (next != null && prerequisites(next)) startStep()
+        if (next != null && !next.startsWith("mic_") && prerequisites(next)) startStep()
     }
 }
