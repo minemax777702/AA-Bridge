@@ -21,6 +21,10 @@ object HuSurvey {
         Scenario("navigation", "Навигация", "Проверьте голосовую подсказку без движения автомобиля."),
         Scenario("voice", "Микрофон", "Вызовите голосовой помощник, проверьте распознавание и завершение."),
         Scenario("volume", "Громкость", "Измените громкость и отключите звук штатными кнопками."),
+        Scenario("call", "Телефонный вызов", "При согласии собеседника проверьте входящий или исходящий вызов и аудиомаршрут; не записывайте разговор без разрешения."),
+        Scenario("gps", "GPS и источник координат", "Сравните отображаемое местоположение со штатной навигацией; не двигайтесь ради теста."),
+        Scenario("focus", "Аудиофокус", "Переключите штатное радио и Android Auto, проверьте паузу и восстановление звука."),
+        Scenario("heartbeat", "Стабильность связи", "Оставьте подключение на 60 секунд; проверяются штатные heartbeat и ответы без новых команд."),
         Scenario("night", "День / ночь", "Измените освещение или штатную тему на стоящем автомобиле."),
         Scenario("parking", "Стояночный тормоз", "Только при безопасно зафиксированном автомобиле проверьте доступное состояние; не снимайте тормоз ради теста."),
         Scenario("gear", "Селектор / камера", "Только если это безопасно и разрешено руководством автомобиля; не двигайтесь, пропустите при сомнениях."),
@@ -44,6 +48,8 @@ object HuSurvey {
     private var baseline = mapOf<String, Long>()
     private val windowSamples = linkedMapOf<String, MutableSet<String>>()
     private var idleSamples = mapOf<String, Set<String>>()
+    private val windowBytes = linkedMapOf<String, MutableList<ByteArray>>()
+    private var idleBytes = mapOf<String, List<ByteArray>>()
 
     @Synchronized fun start() {
         if (!BuildConfig.HU_DIAGNOSTICS) return
@@ -51,6 +57,7 @@ object HuSurvey {
         while (results.length() > 0) results.remove(results.length() - 1)
         current = null; before = emptyMap(); baseline = emptyMap()
         windowSamples.clear(); idleSamples = emptyMap()
+        windowBytes.clear(); idleBytes = emptyMap()
         overflow = 0; running = true
     }
 
@@ -73,7 +80,10 @@ object HuSurvey {
                 val hash = MessageDigest.getInstance("SHA-256").digest(body)
                     .joinToString("") { (it.toInt() and 255).toString(16).padStart(2, '0') }
                 if (stats.samples.size < MAX_SAMPLES) stats.samples.add(hash)
-                if (window != null && window.size < MAX_SAMPLES) window.add(hash)
+                if (window != null && window.size < MAX_SAMPLES && window.add(hash) &&
+                    (protocol == "PXC" || (protocol == "mirror-control" && id.startsWith("0x"))) && direction == "RX") {
+                    windowBytes.getOrPut(key) { mutableListOf() }.add(body.copyOf(minOf(body.size, 128)))
+                }
             }
         }
     }
@@ -97,7 +107,7 @@ object HuSurvey {
         val test = scenarios.firstOrNull { it.id == id } ?: return false
         current = test
         before = packets.mapValues { it.value.count }
-        windowSamples.clear()
+        windowSamples.clear(); windowBytes.clear()
         beginNs = SystemClock.elapsedRealtimeNanos()
         RawHuDump.mark("TEST_BEGIN:$id")
         return true
@@ -110,6 +120,7 @@ object HuSurvey {
         if (test.id == "idle") {
             baseline = delta
             idleSamples = windowSamples.mapValues { it.value.toSet() }
+            idleBytes = windowBytes.mapValues { it.value.toList() }
         }
         val candidates = delta.entries.sortedWith(compareByDescending<Map.Entry<String, Long>> { it.key !in baseline }
             .thenByDescending { it.value }).take(100)
@@ -118,14 +129,31 @@ object HuSurvey {
             .put("candidates", JSONArray().apply {
                 candidates.forEach { (key, count) -> put(JSONObject().put("packet", key).put("count", count)
                     .put("absentInIdleWindow", baseline.isNotEmpty() && key !in baseline)
-                    .put("sampleDiffersFromIdle", idleSamples[key]?.let { idle -> windowSamples[key]?.any { it !in idle } } == true)) }
+                    .put("sampleDiffersFromIdle", idleSamples[key]?.let { idle -> windowSamples[key]?.any { it !in idle } } == true)
+                    .put("candidateByteOffsets", candidateOffsets(key))) }
             })
         if (results.length() < 200) results.put(entry)
         RawHuDump.mark("TEST_END:${test.id}:$result")
         RawHuDump.meta("survey/test", entry.toString())
         current = null
-        windowSamples.clear()
+        windowSamples.clear(); windowBytes.clear()
         return true
+    }
+
+    // Only compare aligned prefixes of parsed messages with same observed size.
+    // A changed offset is a hypothesis, not a decoded vehicle field.
+    private fun candidateOffsets(key: String): JSONArray {
+        val base = idleBytes[key].orEmpty()
+        val test = windowBytes[key].orEmpty()
+        val out = JSONArray()
+        if (base.size < 1 || test.size < 1 || base.any { it.size != base[0].size } ||
+            test.any { it.size != base[0].size }) return out
+        for (i in base[0].indices) {
+            val old = base[0][i]
+            if (base.all { it[i] == old } && test.any { it[i] != old }) out.put(i)
+            if (out.length() >= 64) break
+        }
+        return out
     }
 
     @Synchronized fun status(): String =
