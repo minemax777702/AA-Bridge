@@ -43,9 +43,11 @@ class SocketTransport(
                 ServerSocket().apply { reuseAddress = true; bind(InetSocketAddress(port)) }
             } catch (e: IOException) {
                 logger.log("listen on $port failed: ${e.message}")
+                if (port == InstrumentWire.PORT) (handlerFor("tcp:$port") as? InstrumentChannel)?.listenerStatus("listen-failed")
                 continue
             }
             servers += server
+            if (port == InstrumentWire.PORT) (handlerFor("tcp:$port") as? InstrumentChannel)?.listenerStatus("listening")
             thread(name = "SocketTransport-accept-$port", isDaemon = true) { acceptLoop(server, port) }
         }
         listening = servers.isNotEmpty()
