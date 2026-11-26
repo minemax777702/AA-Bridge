@@ -70,7 +70,7 @@ class HuDiagnosticsActivity : Activity() {
             }
         }
         button("Начать запись (только журнал)") {
-            if (HuCapture.start(this)) snapshot()
+            if (RawHuDump.busy) notice("Сначала остановите RAW") else if (HuCapture.start(this)) snapshot()
             status.text = HuCapture.status()
         }
         button("Снимок устройств и соединения") {
@@ -198,8 +198,9 @@ class HuDiagnosticsActivity : Activity() {
         runCatching {
             val usb = getSystemService(Context.USB_SERVICE) as UsbManager
             usb.accessoryList.orEmpty().forEach {
-                HuCapture.record("USB", "INFO", "accessory",
-                    details = "manufacturer=${it.manufacturer} model=${it.model} version=${it.version} description=${it.description}")
+                val details = "manufacturer=${it.manufacturer} model=${it.model} version=${it.version} description=${it.description}"
+                RawHuDump.meta("USB/accessory", details)
+                HuCapture.record("USB", "INFO", "accessory", details = details)
             }
             usb.deviceList.values.forEach { device ->
                 HuCapture.record("USB", "INFO", "device",
@@ -214,8 +215,9 @@ class HuDiagnosticsActivity : Activity() {
         runCatching {
             val audio = getSystemService(Context.AUDIO_SERVICE) as AudioManager
             audio.getDevices(AudioManager.GET_DEVICES_ALL).forEach {
-                HuCapture.record("audio", "INFO", "device",
-                    details = "type=${it.type} name=${it.productName} source=${it.isSource} sink=${it.isSink}")
+                val details = "type=${it.type} name=${it.productName} source=${it.isSource} sink=${it.isSink}"
+                RawHuDump.meta("audio/device", details)
+                HuCapture.record("audio", "INFO", "device", details = details)
             }
         }.onFailure { HuCapture.record("audio", "ERROR", "snapshot", details = it.toString()) }
     }
