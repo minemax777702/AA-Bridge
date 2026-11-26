@@ -69,3 +69,20 @@ python -m unittest discover -s tools -p "test_*hu*.py"
 ```
 
 The analyzer distinguishes user-observed working functions, advertised fields, observed known commands and unknown candidates. It highlights candidates that recur in multiple captures. Run the raw decoder separately to check completeness. It does not assign unknown vehicle signals or decode proprietary firmware automatically.
+
+## SX11 Comfort targeted survey (EC-RJ-2401)
+
+Observed in an authorized capture: PXC 1.0.2, SDK 0.9.24, JSBD17_0.9.24, reported platform linux_no_package, supportFunction 191, supportConnect 842. These bitmasks have no verified mapping yet. The user's equipment level is Comfort; the advertised voice catalog is not an equipment list. Do not publish the original capture or identifiers.
+
+Observed incoming PXC JSON: 0x10200 night (false observed), 0x10040 navigation (maxNaviIcon 57, supportFunction 0), 0x10690 link (usbSpeed 2048, wifiSpeed 0; units unknown), 0x10470 voice catalog (29660 bytes). Complete bounded JSON is now exported under pxcJson in capabilities.json and changes in traffic.bin. No vehicle control execution is added.
+
+New scenarios observe factory settings, drive mode, cluster brightness, lighting, climate, native voice, radio, cluster navigation and media keys. Only use normal factory controls safely while parked; no forced actuation or CAN injection. A silent phone interface is not proof that the HU lacks vehicle integration.
+
+For direct audio: begin RAW before connecting; stop ordinary music/voice, disable Bluetooth audio, reduce HU volume and explicitly select one documented PXC audio profile. The isolated diagnostic transaction may try the profile even when the HU advertised false. A quiet one-second tone is sent only after start ACK; stop is requested in finally. An ambiguous timeout requires reconnect. Report actual audibility separately: ACK and queued bytes do not prove playback. No automatic retries or format guessing. No persistent capability override.
+
+References (not a claim of exact firmware compatibility):
+- Geely SX11 multimedia manual: https://www.geely-motors.com/usermanual-model-10-coolray_sx11-expl-multi_14032993628816372135.pdf
+- EasyConnection developer overview: https://h5.carbit.cn/developer
+- ScanDoc SX11 multimedia diagnostic overview: https://scandoc.online/last/0/84/22/9
+- Owner forum: https://4pda.to/forum/index.php?showtopic=1001500
+Different generations and firmware are not interchangeable.
