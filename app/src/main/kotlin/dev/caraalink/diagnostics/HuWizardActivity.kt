@@ -166,7 +166,7 @@ class HuWizardActivity : Activity() {
                 }
                 if (mic) {
                     text("Запись до 3 секунд. Произнесите короткую фразу, не содержащую личных данных.")
-                    if (test.id != "mic_pxc" && checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) != android.content.pm.PackageManager.PERMISSION_GRANTED)
+                    if (checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) != android.content.pm.PackageManager.PERMISSION_GRANTED)
                         button("Разрешить микрофон") { requestPermissions(arrayOf(android.Manifest.permission.RECORD_AUDIO), 641) }
                 }
                 button(if (audio) "Воспроизвести сигнал" else "Начать проверку") { startStep() }
@@ -215,6 +215,20 @@ class HuWizardActivity : Activity() {
         "gps" -> "Положение на карте соответствует текущему?"
         "display" -> "Изображение Android Auto отображается корректно?"
         "touch" -> "Касания и свайпы отрабатывают корректно?"
+        "touch_tap" -> "Все точки экрана реагируют на касание?"
+        "touch_swipe" -> "Карта перемещается во всех направлениях?"
+        "touch_long" -> "Долгое нажатие распознаётся?"
+        "map_tilt" -> "Карта меняет угол наклона?"
+        "key_next", "key_prev" -> "Трек переключился?"
+        "key_play" -> "Пауза и воспроизведение сработали?"
+        "key_voice" -> "Голосовой помощник открылся?"
+        "key_back" -> "Штатная кнопка вызвала возврат?"
+        "night_on", "night_off" -> "Android Auto переключился на соответствующую тему?"
+        "volume_up", "volume_down", "volume_mute" -> "Громкость изменилась как ожидалось?"
+        "vehicle_speed", "engine_rpm", "engine_temp", "fuel", "tire_pressure" -> "Штатное значение отображается на приборной панели или ГУ?"
+        "display_fit" -> "Все элементы интерфейса видны, ничего не обрезано?"
+        "display_resume" -> "Изображение вернулось после открытия CarbitLink?"
+        "time_sync" -> "Время на телефоне и ГУ совпадает?"
         "volume" -> "Громкость изменяется штатными кнопками?"
         "drive_mode" -> "Штатный интерфейс показал изменение режима движения?"
         "cluster_light" -> "Яркость приборной панели изменилась?"
