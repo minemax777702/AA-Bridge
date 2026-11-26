@@ -309,6 +309,15 @@ class AaSessionProbe(
                 .build()
             runCatching {
                 channel.sendChannelSpecific(AaServiceDiscovery.CHANNEL_INPUT_SOURCE, AaFraming.MSG_INPUT_REPORT, report)
+                if (dev.caraalink.diagnostics.RawHuDump.active) {
+                    val detail = org.json.JSONObject().put("action", action).put("actionIndex", actionIndex)
+                        .put("pointers", org.json.JSONArray().apply {
+                            pointers.forEach { (x, y, pointerId) ->
+                                put(org.json.JSONObject().put("id", pointerId).put("x", x).put("y", y))
+                            }
+                        })
+                    dev.caraalink.diagnostics.RawHuDump.meta("gesture/aa-input-sent", detail.toString())
+                }
             }.onFailure { Log.w(TAG, "sendTouch failed", it) }
         }
     }
