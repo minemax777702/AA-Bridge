@@ -11,6 +11,7 @@ internal object HuAudioProbe {
     @Volatile private var target: CarbitAudioTransport? = null
     private val running = AtomicBoolean()
     val profiles get() = CarbitAudioTransport.Stream.entries
+    val available: Boolean get() = target != null && !running.get()
     fun attach(audio: CarbitAudioTransport) {
         if (BuildConfig.HU_DIAGNOSTICS) target = audio
     }
