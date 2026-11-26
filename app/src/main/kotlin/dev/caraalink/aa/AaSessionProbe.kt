@@ -466,8 +466,14 @@ class AaSessionProbe(
                 soTimeout = config.readTimeoutMs
             }
             socket = s
-            val input = DataInputStream(s.getInputStream())
-            val output = s.getOutputStream()
+            val traceId = if (dev.caraalink.BuildConfig.HU_DIAGNOSTICS)
+                dev.caraalink.diagnostics.RawHuDump.streamId("android-auto-local") else null
+            if (traceId != null) dev.caraalink.diagnostics.RawHuDump.meta(traceId,
+                "phone-side Android Auto wire, not head-unit traffic")
+            val input = DataInputStream(if (traceId == null) s.getInputStream()
+                else dev.caraalink.diagnostics.RawHuDump.wrapInput(s.getInputStream(), traceId))
+            val output = if (traceId == null) s.getOutputStream()
+                else dev.caraalink.diagnostics.RawHuDump.wrapOutput(s.getOutputStream(), traceId)
             logger.log("tcp connected ${s.localSocketAddress} -> ${s.remoteSocketAddress}")
 
             // --- rung 1: version exchange ---
