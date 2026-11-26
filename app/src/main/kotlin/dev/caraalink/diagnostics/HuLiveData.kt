@@ -17,6 +17,7 @@ internal object HuLiveData {
     private var owner: Any? = null
     private var connected = false
     private var started = 0L
+    private var lastNonempty: JSONObject? = null
     private val fields = linkedMapOf<String, Value>()
     private val packets = linkedMapOf<String, Packet>()
     private val changes = ArrayDeque<JSONObject>()
@@ -29,6 +30,8 @@ internal object HuLiveData {
 
     @Synchronized fun begin(session: Any) {
         if (!BuildConfig.HU_DIAGNOSTICS) return
+        if (fields.isNotEmpty()) lastNonempty = JSONObject().put("sessionStartedMs", started)
+            .put("rawFields", JSONArray(rawFields().map { JSONObject().put("source", it.source).put("value", it.value).put("kind", it.kind).put("lastReceivedMs", it.at) }))
         owner = session
         connected = true
         started = System.currentTimeMillis()
@@ -143,6 +146,35 @@ internal object HuLiveData {
         value("mirror/key", "lastCode", key)
     }
 
+    @Synchronized fun instrumentLink(session: Any, status: String) {
+        if (accepts(session)) value("Instrument/link", "status", status)
+    }
+
+    @Synchronized fun instrumentPacket(session: Any, cmd: Int, body: ByteArray) {
+        if (!accepts(session)) return
+        val source = "Instrument/0x" + cmd.toUInt().toString(16).padStart(8, '0')
+        val p = packet(source, body.size) ?: return
+        if (cmd != dev.caraalink.link.InstrumentWire.MXC) binary(source, p, body)
+    }
+
+    @Synchronized fun instrumentFields(session: Any, source: String, json: JSONObject) {
+        if (accepts(session)) flatten("Instrument/$source", json)
+    }
+
+    @Synchronized fun instrumentMcu(session: Any, frame: dev.caraalink.link.InstrumentWire.McuFrame) {
+        if (!accepts(session)) return
+        val source = "Instrument/MCU/0x" + frame.type.toString(16).padStart(4, '0')
+        val p = packet(source, frame.bytes.size) ?: return
+        if (frame.signals.isEmpty()) binary(source, p, frame.bytes)
+        else {
+            value("Instrument/link", "status", "telemetry")
+            frame.signals.forEach {
+                value("Instrument/values", it.name + ".valid", it.valid)
+                value("Instrument/values", it.name, it.raw)
+            }
+        }
+    }
+
     private fun binary(source: String, p: Packet, body: ByteArray) {
         if (body.isEmpty() || body.size > MAX_BINARY) return
         val old = p.previous
@@ -168,12 +200,50 @@ internal object HuLiveData {
         val night = fields["PXC/0x00010200/night"]
         out.add(Row("Ночной режим", if (night == null || night.type != "boolean") "Нет данных" else if (night.text == "true") "Да" else "Нет",
             "PXC/0x00010200/night", if (night?.type == "boolean") "state" else "unknown", night?.at ?: 0))
-        // No verified protocol mapping for these vehicle signals yet.
-        listOf("Зажигание", "Двигатель запущен", "Дверь водителя", "Передняя правая дверь", "Задняя левая дверь",
-            "Задняя правая дверь", "Багажник", "Капот", "Габариты", "Ближний свет", "Дальний свет",
-            "Подсветка приборов", "Режим Eco / Sport / Comfort", "Селектор КПП", "Стояночный тормоз",
-            "Парктроники", "Камера заднего вида", "Скорость автомобиля", "Обороты двигателя",
-            "Температура двигателя", "Топливо", "Давление шин", "Температура салона", "Настройка климата",
+        val reversing = fields["PXC/0x00010460/reversing"]
+        out.add(Row("Задний ход (событие PXC)", when (reversing?.text) {
+            "4112" -> "Да"; "4113" -> "Нет"; else -> "Нет данных"
+        }, "PXC/0x00010460/reversing", if (reversing?.text in listOf("4112", "4113")) "state" else "unknown", reversing?.at ?: 0))
+        field("Событие Bluetooth (код)", "PXC/0x00010460", "bluetooth", "observed")
+        field("Режим движения PXC (код приложения)", "PXC/0x00010460", "drivingMode", "observed")
+        field("Instrument 10926", "Instrument/link", "status", "observed")
+        fun signal(label: String, name: String, bool: Boolean = false) {
+            val source = "Instrument/values/$name"
+            val v = fields[source]
+            val valid = fields["$source.valid"]
+            val available = v != null && valid?.text == "true"
+            val link = fields["Instrument/link/status"]?.text
+            val fresh = connected && link == "telemetry" && available && System.currentTimeMillis() - (v?.at ?: 0) < 10000
+            val display = if (!available || v == null) "Нет данных" else if (bool)
+                (if (v.text == "1") "Да" else if (v.text == "0") "Нет" else v.text)
+            else v.text + " (raw)"
+            out.add(Row(label, display, source, if (!available) "unknown" else if (fresh) "state" else "stale", v?.at ?: 0))
+        }
+        signal("Зажигание", "IGN", true)
+        signal("Скорость автомобиля", "SPEED")
+        signal("Обороты двигателя", "RPM")
+        signal("Селектор КПП (код)", "GEAR")
+        signal("Температура ОЖ", "TEMP_WATER")
+        signal("Температура воздуха", "TEMP_AIR")
+        signal("Топливо (%) — raw", "FUEL_PERCENT")
+        signal("Остаток топлива", "FUEL_REMAIN")
+        signal("Пробег", "ODO")
+        signal("Пробег поездки 1", "TRIP1")
+        signal("Пробег поездки 2", "TRIP2")
+        signal("Запас хода", "RANGE_LEFT")
+        signal("Ближний свет", "LIGHT_NEAR", true)
+        signal("Дальний свет", "LIGHT_FAR", true)
+        signal("Левый поворотник", "LIGHT_TURN_LEFT", true)
+        signal("Правый поворотник", "LIGHT_TURN_RIGHT", true)
+        signal("Индикатор габаритов", "LIGHT_EDGE", true)
+        signal("Индикатор стояночного тормоза", "LIGHT_PARK", true)
+        signal("Индикатор заднего хода", "LIGHT_GEAR_R", true)
+        signal("Подсветка приборов", "BACKLIGHT_LEVEL")
+        signal("Режим двигателя (код Instrument)", "DRIVE_MODE")
+        // No verified protocol mapping for these remaining vehicle signals yet.
+        listOf("Двигатель запущен", "Дверь водителя", "Передняя правая дверь", "Задняя левая дверь",
+            "Задняя правая дверь", "Багажник", "Капот", "Парктроники", "Камера заднего вида",
+            "Давление шин", "Температура салона", "Настройка климата",
             "Кондиционер", "Вентилятор", "GPS автомобиля").forEach {
             out.add(Row(it, "Нет данных", "Семантика не подтверждена", "unknown"))
         }
@@ -219,5 +289,6 @@ internal object HuLiveData {
         .put("packetTypes", JSONArray(packetRows().map { JSONObject().put("source", it.source).put("value", it.value)
             .put("lastReceivedMs", it.at) }))
         .put("changes", JSONArray(changes.toList()))
+        .put("lastNonemptyPreviousSession", lastNonempty ?: JSONObject.NULL)
         .put("interpretation", "Incoming HU observations only; unknown does not mean false. Advertised support is not actual state. Binary changes are not decoded vehicle signals.")
 }
