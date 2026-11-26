@@ -22,7 +22,8 @@ object HuSurvey {
         Scenario("audio_pxc_talkie", "Прямой звук TALKIE", "Тест PXC без Bluetooth."),
         Scenario("display", "Экран и видео", "Откройте Android Auto, проверьте изображение, возврат и повторное открытие."),
         Scenario("map_zoom", "Масштабирование карты", "Разведите и сведите два пальца на карте Android Auto."),
-        Scenario("map_rotate", "Вращение карты", "Поверните два пальца вокруг общего центра, почти не меняя расстояние между ними. Проверьте, повернулась ли карта."),
+        Scenario("map_rotate", "Вращение карты: обычный профиль", "Поверните два пальца вокруг общего центра, почти не меняя расстояние между ними. Проверьте, повернулась ли карта."),
+        Scenario("map_rotate_full", "Вращение карты: полный поток касаний", "Повторите тот же жест. Только в этом тесте все события движения двух пальцев передаются без ограничения 30 мс."),
         Scenario("touch", "Сенсор", "Нажмите четыре угла и центр, выполните свайп и мультитач, если доступен."),
         Scenario("wheel", "Кнопки руля", "По отдельности проверьте кнопки мультимедиа, голос и возврат."),
         Scenario("music", "Музыка", "Включите и остановите музыку в Android Auto, проверьте источник звука."),
@@ -160,11 +161,13 @@ object HuSurvey {
 
     @Synchronized fun hasActiveTest(): Boolean = current != null
 
+    @Synchronized fun isScenarioActive(id: String): Boolean = running && current?.id == id
+
     @Synchronized fun finish(result: String, evidence: JSONObject? = null): Boolean {
         val test = current ?: return false
         if (result !in listOf("works", "failed", "not-tested", "inconclusive")) return false
         val delta = packets.mapValues { (key, value) -> value.count - (before[key] ?: 0L) }.filterValues { it > 0 }
-        if (test.id == "idle") {
+        if (test.id == "idle" && result == "works") {
             baseline = delta
             idleSamples = windowSamples.mapValues { it.value.toSet() }
             idleBytes = windowBytes.mapValues { it.value.toList() }
