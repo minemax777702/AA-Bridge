@@ -108,6 +108,7 @@ class PxcChannel(
     }
 
     private fun handle(stream: MirrorStream, cmd: Int, extra: Int, body: ByteArray) {
+        dev.caraalink.diagnostics.HuCapture.pxc("RX", cmd, extra, body, stream.localId)
         if (channelOf[stream.localId] == null) {
             channelOf[stream.localId] = cmd
             logger.log("PXC channel open 0x${hex(cmd)} on stream ${stream.localId}")
@@ -169,6 +170,7 @@ class PxcChannel(
         .toString().toByteArray(Charsets.UTF_8)
 
     private fun head(cmd: Int, body: ByteArray, extra: Int): ByteArray {
+        dev.caraalink.diagnostics.HuCapture.pxc("TX_BUILT", cmd, extra, body)
         val total = 16 + body.size
         return ByteBuffer.allocate(total).order(ByteOrder.LITTLE_ENDIAN)
             .putInt(cmd).putInt(total).putInt(cmd xor total).putInt(extra).put(body).array()
