@@ -215,6 +215,7 @@ class QdTransport(
     private val logger: DiagnosticLogger,
     private val host: MirrorHost,
     private val onClosed: (String) -> Unit,
+    private val liveOwner: Any? = null,
 ) : CarTransport {
 
     private val queue = LinkedBlockingQueue<Queued>()
@@ -376,6 +377,7 @@ class QdTransport(
 
     private fun onCommand(msg: JSONObject) {
         val para = msg.optJSONObject("PARA") ?: JSONObject()
+        if (dev.caraalink.BuildConfig.HU_DIAGNOSTICS) dev.caraalink.diagnostics.HuLiveData.qd(liveOwner, msg.optString("CMD").ifBlank { "unknown" }, para)
         if (dev.caraalink.diagnostics.HuCapture.active) {
             val id = msg.optString("CMD").ifBlank { "unknown" }
             dev.caraalink.diagnostics.HuCapture.record("QDLink-command", "RX", id, details = para.toString())
