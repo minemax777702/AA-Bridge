@@ -42,12 +42,15 @@ object HuSurvey {
     private var beginNs = 0L
     private var before = mapOf<String, Long>()
     private var baseline = mapOf<String, Long>()
+    private val windowSamples = linkedMapOf<String, MutableSet<String>>()
+    private var idleSamples = mapOf<String, Set<String>>()
 
     @Synchronized fun start() {
         if (!BuildConfig.HU_DIAGNOSTICS) return
         packets.clear(); fields.clear()
         while (results.length() > 0) results.remove(results.length() - 1)
         current = null; before = emptyMap(); baseline = emptyMap()
+        windowSamples.clear(); idleSamples = emptyMap()
         overflow = 0; running = true
     }
 
@@ -62,11 +65,16 @@ object HuSurvey {
         stats.min = minOf(stats.min, length)
         stats.max = maxOf(stats.max, length)
         // Hash bounded non-media samples only; RAW retains actual bytes.
-        if (body != null && body.size <= 4096 && stats.samples.size < MAX_SAMPLES &&
-            (stats.count <= 8 || stats.count % 32 == 0L)) {
-            val hash = MessageDigest.getInstance("SHA-256").digest(body)
-                .joinToString("") { "%02x".format(it) }
-            stats.samples.add(hash)
+        if (body != null && body.size <= 4096) {
+            val window = if (current != null && (key in windowSamples || windowSamples.size < 256))
+                windowSamples.getOrPut(key) { linkedSetOf() } else null
+            if ((stats.samples.size < MAX_SAMPLES || (window != null && window.size < MAX_SAMPLES)) &&
+                (stats.count <= 8 || stats.count % 16 == 0L || window?.isEmpty() == true)) {
+                val hash = MessageDigest.getInstance("SHA-256").digest(body)
+                    .joinToString("") { (it.toInt() and 255).toString(16).padStart(2, '0') }
+                if (stats.samples.size < MAX_SAMPLES) stats.samples.add(hash)
+                if (window != null && window.size < MAX_SAMPLES) window.add(hash)
+            }
         }
     }
 
@@ -89,6 +97,7 @@ object HuSurvey {
         val test = scenarios.firstOrNull { it.id == id } ?: return false
         current = test
         before = packets.mapValues { it.value.count }
+        windowSamples.clear()
         beginNs = SystemClock.elapsedRealtimeNanos()
         RawHuDump.mark("TEST_BEGIN:$id")
         return true
@@ -98,19 +107,24 @@ object HuSurvey {
         val test = current ?: return false
         if (result !in listOf("works", "failed", "not-tested", "inconclusive")) return false
         val delta = packets.mapValues { (key, value) -> value.count - (before[key] ?: 0L) }.filterValues { it > 0 }
-        if (test.id == "idle") baseline = delta
+        if (test.id == "idle") {
+            baseline = delta
+            idleSamples = windowSamples.mapValues { it.value.toSet() }
+        }
         val candidates = delta.entries.sortedWith(compareByDescending<Map.Entry<String, Long>> { it.key !in baseline }
             .thenByDescending { it.value }).take(100)
         val entry = JSONObject().put("scenario", test.id).put("userResult", result)
             .put("durationMs", (SystemClock.elapsedRealtimeNanos() - beginNs) / 1_000_000)
             .put("candidates", JSONArray().apply {
                 candidates.forEach { (key, count) -> put(JSONObject().put("packet", key).put("count", count)
-                    .put("absentInIdleWindow", baseline.isNotEmpty() && key !in baseline)) }
+                    .put("absentInIdleWindow", baseline.isNotEmpty() && key !in baseline)
+                    .put("sampleDiffersFromIdle", idleSamples[key]?.let { idle -> windowSamples[key]?.any { it !in idle } } == true)) }
             })
         if (results.length() < 200) results.put(entry)
         RawHuDump.mark("TEST_END:${test.id}:$result")
         RawHuDump.meta("survey/test", entry.toString())
         current = null
+        windowSamples.clear()
         return true
     }
 
