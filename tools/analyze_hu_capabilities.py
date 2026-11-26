@@ -22,6 +22,10 @@ KNOWN = {
     "PXC/RX/0x00010060": "HU microphone data message observed",
     "PXC/RX/0x00010020": "HU audio capability announcement",
     "PXC/RX/0x00010010": "HU client information announcement",
+    "PXC/RX/0x00010200": "HU day/night state",
+    "PXC/RX/0x00010470": "HU advertised voice catalog, not command execution",
+    "PXC/RX/0x00010040": "HU navigation parameters, not cluster display proof",
+    "PXC/RX/0x00010690": "HU link parameters; units not verified",
     "mirror/RX/touch": "HU touch callback observed",
     "mirror/RX/key": "HU key callback observed",
     "mirror/RX/capture-config": "HU capture configuration observed",
@@ -46,11 +50,16 @@ def analyze(manifest, survey):
     tests = survey.get("manualTests", [])
     packets = survey.get("packets", [])
     features = {}
-    for name, prefixes in FEATURES.items():
+    all_features = dict(FEATURES)
+    for test in tests:
+        if isinstance(test.get("scenario"), str):
+            all_features.setdefault(test["scenario"], ())
+    for name, prefixes in all_features.items():
         advertised = {k: v for k, v in fields.items()
                       if any(k.startswith(p) if p.endswith(".") else k == p for p in prefixes)}
         attempts = [t for t in tests if t.get("scenario") == name]
         features[name] = dict(advertised=advertised, user_results=[t.get("userResult") for t in attempts],
+                              evidence=[t.get("wizardEvidence", {}) for t in attempts],
                               status="user-reported-working" if any(t.get("userResult") == "works" for t in attempts)
                               else "user-tested-not-confirmed" if any(t.get("userResult") == "failed" for t in attempts)
                               else "advertised-fields-observed" if advertised else "not-established")
@@ -73,7 +82,8 @@ def analyze(manifest, survey):
                 features=features, observed_known=[dict(id=p["id"], count=p.get("count"), meaning=KNOWN[p["id"]])
                     for p in packets if p.get("id") in KNOWN],
                 unknown_candidates=[dict(id=k, observations=v) for k,v in sorted(candidates.items()) if k not in KNOWN],
-                inventory=packets, advertised_fields=fields,
+                inventory=packets, advertised_fields=fields, pxc_json=survey.get("pxcJson", {}),
+                manual_tests=tests,
                 warnings=["Correlation and hashes are not protocol semantics.",
                           "A user result is not automatically verified by packet evidence.",
                           "AA-local is phone-side, not a head-unit capability.",
