@@ -24,6 +24,8 @@ object HuCapture {
         var count: Int = 0,
         var bytes: Int = 0,
         var dropped: Long = 0,
+        var adbDataRx: Long = 0,
+        var adbDataTx: Long = 0,
     )
     @Volatile private var session: Session? = null
     val active: Boolean get() = session != null
@@ -41,7 +43,8 @@ object HuCapture {
         val s = session ?: return
         session = null
         s.logger.log(JSONObject().put("session", s.id).put("event", "STOP")
-            .put("events", s.count).put("dropped", s.dropped).put("estimatedBytes", s.bytes).toString())
+            .put("events", s.count).put("dropped", s.dropped).put("estimatedBytes", s.bytes)
+            .put("adbDataRx", s.adbDataRx).put("adbDataTx", s.adbDataTx).toString())
     }
 
     fun status(): String = synchronized(this) {
@@ -86,6 +89,21 @@ object HuCapture {
             s.count++
             s.bytes += cost
             s.logger.log(line)
+        }
+    }
+
+    // WRTE/OKAY include the high-volume projection stream. Preserve counters
+    // and sample their headers, so video cannot exhaust the control trace.
+    fun adb(direction: String, cmd: Int, arg0: Int, arg1: Int, length: Int) {
+        if (!active) return
+        synchronized(this) {
+            val s = session ?: return
+            if (cmd == 0x45545257 || cmd == 0x59414b4f) {
+                val count = if (direction == "RX") ++s.adbDataRx else ++s.adbDataTx
+                if (count > 8 && count % 128 != 0L) return
+            }
+            record("ADB", direction, "0x" + cmd.toUInt().toString(16),
+                length = length, details = "arg0=$arg0 arg1=$arg1")
         }
     }
 
