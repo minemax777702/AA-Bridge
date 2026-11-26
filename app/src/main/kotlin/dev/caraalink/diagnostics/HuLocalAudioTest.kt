@@ -26,8 +26,9 @@ internal object HuLocalAudioTest {
         val out = JSONObject().put("requested", if (bluetooth) "bluetooth-media" else "android-default-no-bt")
         var track: AudioTrack? = null
         try {
-            val devices = bluetoothOutputs(context)
-            if ((!bluetooth && devices.isNotEmpty()) || (bluetooth && devices.size != 1))
+            val outputs = bluetoothOutputs(context)
+            val devices = outputs.filter { it.type != AudioDeviceInfo.TYPE_BLUETOOTH_SCO }
+            if ((!bluetooth && outputs.isNotEmpty()) || (bluetooth && devices.size != 1))
                 return out.put("status", "prerequisite-not-met")
             val rate = 48000
             val samples = ShortArray(rate * 2) { n ->
@@ -52,12 +53,14 @@ internal object HuLocalAudioTest {
             if (!keepGoing()) return out.put("status", "cancelled")
             audio.play()
             val routes = linkedSetOf<Int>()
+            val routeIds = linkedSetOf<Int>()
             val end = SystemClock.elapsedRealtime() + 2200
             while (keepGoing() && SystemClock.elapsedRealtime() < end) {
-                audio.routedDevice?.let { routes.add(it.type) }
+                audio.routedDevice?.let { routes.add(it.type); routeIds.add(it.id) }
                 Thread.sleep(40)
             }
-            val verified = routes.isNotEmpty() && routes.all { (it in bluetoothTypes) == bluetooth }
+            val verified = routes.isNotEmpty() && routes.all { (it in bluetoothTypes) == bluetooth } &&
+                (!bluetooth || routeIds == setOf(devices.single().id))
             return out.put("observedRouteTypes", org.json.JSONArray(routes.toList()))
                 .put("routeVerified", verified).put("status", if (keepGoing()) "played" else "cancelled")
         } catch (e: Exception) {
