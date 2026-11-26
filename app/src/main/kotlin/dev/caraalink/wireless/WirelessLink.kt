@@ -126,6 +126,7 @@ class WirelessLink(
             seen[d.deviceAddress] = d
             // Every drive's log shows whether the car's address changes after a restart.
             logger.log("peer: '${d.deviceName}' ${d.deviceAddress} type=${d.primaryDeviceType} status=${d.status}")
+            dev.caraalink.diagnostics.RawHuDump.meta("wifi-discovery", "peerName=${d.deviceName} type=${d.primaryDeviceType} status=${d.status}")
             NearbyDevice(d.deviceName, d.deviceAddress, isCarType(d.primaryDeviceType))
         }
         listener.onPeers(peers)
@@ -137,6 +138,7 @@ class WirelessLink(
             if (groupFormed) return
             groupFormed = true
             logger.log("group formed: phoneIsOwner=${info.isGroupOwner} owner=${info.groupOwnerAddress?.hostAddress}")
+            dev.caraalink.diagnostics.RawHuDump.meta("wifi-discovery", "group formed phoneIsOwner=${info.isGroupOwner}")
             val owner = info.groupOwnerAddress?.hostAddress
             if (!info.isGroupOwner && owner != null) listener.onCarReachable(owner, p2pAddress()) else findCarByMdns()
         } else if (groupFormed) {
@@ -165,6 +167,7 @@ class WirelessLink(
                         @Suppress("DEPRECATION")
                         val host = s.host?.hostAddress ?: return
                         logger.log("mDNS: '${s.serviceName}' at $host:${s.port}")
+                        dev.caraalink.diagnostics.RawHuDump.meta("wifi-discovery", "mDNS name=${s.serviceName} type=${s.serviceType} port=${s.port}")
                         if (!reported && !closed) {
                             reported = true
                             main.post { listener.onCarReachable(host, p2pAddress()) }
