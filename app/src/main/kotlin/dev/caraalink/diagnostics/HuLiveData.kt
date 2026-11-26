@@ -30,7 +30,7 @@ internal object HuLiveData {
 
     @Synchronized fun begin(session: Any) {
         if (!BuildConfig.HU_DIAGNOSTICS) return
-        if (fields.isNotEmpty()) lastNonempty = JSONObject().put("sessionStartedMs", started)
+        if (fields.keys.any { !it.startsWith("Instrument/link/") }) lastNonempty = JSONObject().put("sessionStartedMs", started)
             .put("rawFields", JSONArray(rawFields().map { JSONObject().put("source", it.source).put("value", it.value).put("kind", it.kind).put("lastReceivedMs", it.at) }))
         owner = session
         connected = true
@@ -203,10 +203,25 @@ internal object HuLiveData {
         val reversing = fields["PXC/0x00010460/reversing"]
         out.add(Row("Задний ход (событие PXC)", when (reversing?.text) {
             "4112" -> "Да"; "4113" -> "Нет"; else -> "Нет данных"
-        }, "PXC/0x00010460/reversing", if (reversing?.text in listOf("4112", "4113")) "state" else "unknown", reversing?.at ?: 0))
+        }, "PXC/0x00010460/reversing", if (reversing?.text in listOf("4112", "4113")) (if (connected) "state" else "stale") else "unknown", reversing?.at ?: 0))
         field("Событие Bluetooth (код)", "PXC/0x00010460", "bluetooth", "observed")
         field("Режим движения PXC (код приложения)", "PXC/0x00010460", "drivingMode", "observed")
-        field("Instrument 10926", "Instrument/link", "status", "observed")
+        val linkState = fields["Instrument/link/status"]
+        val linkLabel = when (linkState?.text) {
+            "waiting" -> "Ожидается канал"
+            "listening" -> "Ожидается подключение"
+            "listen-failed" -> "Не удалось открыть порт"
+            "accepted" -> "Соединение принято"
+            "channel-open", "receiving" -> "Канал открыт, ожидаются данные"
+            "p2c-connected" -> "Обратный канал открыт"
+            "telemetry" -> "Данные получены"
+            "closed" -> "Канал закрыт"
+            "invalid-header" -> "Некорректный заголовок"
+            "unsupported-or-duplicate-channel" -> "Неизвестный или повторный канал"
+            else -> "Нет данных"
+        }
+        out.add(Row("Instrument 10926", if (connected) linkLabel else "Нет активного соединения",
+            "Instrument/link/status", if (connected && linkState != null) "observed" else "unknown", linkState?.at ?: 0))
         fun signal(label: String, name: String, bool: Boolean = false) {
             val source = "Instrument/values/$name"
             val v = fields[source]
@@ -231,6 +246,10 @@ internal object HuLiveData {
         signal("Пробег поездки 1", "TRIP1")
         signal("Пробег поездки 2", "TRIP2")
         signal("Запас хода", "RANGE_LEFT")
+        signal("Средняя скорость поездки 1", "TRIP1_AVG_SPEED")
+        signal("Средняя скорость поездки 2", "TRIP2_AVG_SPEED")
+        signal("Средний расход", "TIMER_AVG_CONSUME")
+        signal("Общее время движения", "TOTAL_DRIVE_TIME")
         signal("Ближний свет", "LIGHT_NEAR", true)
         signal("Дальний свет", "LIGHT_FAR", true)
         signal("Левый поворотник", "LIGHT_TURN_LEFT", true)
