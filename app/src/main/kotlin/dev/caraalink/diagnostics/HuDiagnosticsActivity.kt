@@ -26,7 +26,7 @@ class HuDiagnosticsActivity : Activity() {
     private var pendingDump: File? = null
     private val tick = object : Runnable {
         override fun run() {
-            status.text = HuCapture.status() + "\n" + RawHuDump.status() + "\n" + ConnectionStateHolder.snapshot.phase
+            status.text = HuCapture.status() + "\n" + RawHuDump.status() + "\n" + HuSurvey.status() + "\n" + ConnectionStateHolder.snapshot.phase
             handler.postDelayed(this, 1000)
         }
     }
@@ -76,6 +76,42 @@ class HuDiagnosticsActivity : Activity() {
         button("Снимок устройств и соединения") {
             if (HuCapture.active || RawHuDump.active) snapshot() else notice("Сначала начните запись")
         }
+        text("Мастер проверки возможностей", 20f)
+        button("Выбрать сценарий") {
+            if (!HuCapture.active) notice("Сначала начните запись") else {
+                val scenarios = HuSurvey.scenarios
+                AlertDialog.Builder(this).setTitle("Сценарии")
+                    .setItems(scenarios.map { it.title }.toTypedArray()) { _, index ->
+                        val test = scenarios[index]
+                        AlertDialog.Builder(this).setTitle(test.title).setMessage(test.instructions)
+                            .setNegativeButton("Отмена", null)
+                            .setPositiveButton("Начать") { _, _ ->
+                                if (HuSurvey.begin(test.id)) notice("Тест начат: ${test.title}")
+                                else notice("Завершите текущий тест")
+                            }.show()
+                    }.show()
+            }
+        }
+        button("Завершить текущий тест") {
+            val values = listOf("works", "failed", "inconclusive", "not-tested")
+            AlertDialog.Builder(this).setTitle("Результат по наблюдению пользователя")
+                .setItems(arrayOf("Работает", "Не работает", "Неясно", "Пропущено")) { _, index ->
+                    if (HuSurvey.finish(values[index])) notice("Результат сохранён")
+                    else notice("Нет активного теста")
+                }.show()
+        }
+        button("Карта наблюдений") {
+            val report = HuSurvey.report()
+            val fields = report.optJSONObject("advertisedFields") ?: org.json.JSONObject()
+            val summary = buildString {
+                appendLine(HuSurvey.status())
+                appendLine("Объявленные параметры ГУ (не доказательство работы):")
+                fields.keys().forEach { key -> appendLine("$key = ${fields.optString(key)}") }
+                appendLine("Отсутствие события не означает отсутствие функции.")
+            }
+            AlertDialog.Builder(this).setTitle("Карта наблюдений")
+                .setMessage(summary).setPositiveButton("Закрыть", null).show()
+        }
         text("Метки действий: отметьте начало проверки, выполните действие и отметьте результат.", 18f)
         for (label in listOf("USB / Wi-Fi Direct", "Экран / сенсор", "Кнопки руля", "Музыка",
             "Навигационные подсказки", "Микрофон / голос", "Зажигание", "Стояночный тормоз",
@@ -90,8 +126,8 @@ class HuDiagnosticsActivity : Activity() {
             }
         }
         button("Остановить запись") {
-            RawHuDump.stop()
             HuCapture.stop()
+            RawHuDump.stop()
             status.text = RawHuDump.status()
         }
         button("Экспорт полного дампа ZIP") { chooseDump(false) }
