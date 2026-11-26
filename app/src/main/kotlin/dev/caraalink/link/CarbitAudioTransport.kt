@@ -36,6 +36,9 @@ internal class CarbitAudioTransport(
     private var probePhase = "idle"
     private var probeDeadline = 0L
 
+    @Synchronized fun diagnosticReady(): Boolean = probe == null && !playbackFailed && pending == null &&
+        active.isEmpty() && stopping.isEmpty() && micState == MicState.IDLE
+
     @Synchronized fun beginDiagnosticProbe(stream: Stream): Boolean {
         expireRequests()
         if (probe != null || playbackFailed || pending != null || active.isNotEmpty() ||
