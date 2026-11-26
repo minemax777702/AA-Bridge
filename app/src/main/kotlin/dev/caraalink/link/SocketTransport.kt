@@ -37,7 +37,8 @@ class SocketTransport(
 
     fun start() {
         if (!running.compareAndSet(false, true)) return
-        for (port in PORTS) {
+        val ports = if (BuildConfig.HU_DIAGNOSTICS) PORTS + InstrumentWire.PORT else PORTS
+        for (port in ports) {
             val server = try {
                 ServerSocket().apply { reuseAddress = true; bind(InetSocketAddress(port)) }
             } catch (e: IOException) {
@@ -69,10 +70,14 @@ class SocketTransport(
                 runCatching { socket.close() }
                 continue
             }
+            if (port == InstrumentWire.PORT && streams.count { it.socket.localPort == port } >= 4) {
+                runCatching { socket.close() }; continue
+            }
+            if (port == InstrumentWire.PORT) socket.soTimeout = 15000
             socket.tcpNoDelay = true
             val handler = handlerFor("tcp:$port")
             logger.log("car connected to tcp:$port from ${socket.remoteSocketAddress}")
-            accepted++
+            if (port != InstrumentWire.PORT) accepted++
             if (handler == null) {
                 runCatching { socket.close() }
                 continue
