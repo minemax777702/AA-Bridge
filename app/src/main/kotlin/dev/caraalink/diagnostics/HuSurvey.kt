@@ -14,6 +14,12 @@ object HuSurvey {
     data class Scenario(val id: String, val title: String, val instructions: String)
     val scenarios = listOf(
         Scenario("idle", "Фоновый обмен", "Не трогайте ГУ 30–60 секунд."),
+        Scenario("audio_phone", "Звук телефона без Bluetooth", "Тестовый сигнал обычным аудиомаршрутом Android."),
+        Scenario("audio_bt", "Звук через Bluetooth", "Тестовый сигнал через выбранный Bluetooth-аудиовыход."),
+        Scenario("audio_pxc_music", "Прямой звук MUSIC", "Тест PXC без Bluetooth."),
+        Scenario("audio_pxc_tts", "Прямой звук TTS", "Тест PXC без Bluetooth."),
+        Scenario("audio_pxc_vr", "Прямой звук VR", "Тест PXC без Bluetooth."),
+        Scenario("audio_pxc_talkie", "Прямой звук TALKIE", "Тест PXC без Bluetooth."),
         Scenario("display", "Экран и видео", "Откройте Android Auto, проверьте изображение, возврат и повторное открытие."),
         Scenario("touch", "Сенсор", "Нажмите четыре угла и центр, выполните свайп и мультитач, если доступен."),
         Scenario("wheel", "Кнопки руля", "По отдельности проверьте кнопки мультимедиа, голос и возврат."),
@@ -150,7 +156,9 @@ object HuSurvey {
         return true
     }
 
-    @Synchronized fun finish(result: String): Boolean {
+    @Synchronized fun hasActiveTest(): Boolean = current != null
+
+    @Synchronized fun finish(result: String, evidence: JSONObject? = null): Boolean {
         val test = current ?: return false
         if (result !in listOf("works", "failed", "not-tested", "inconclusive")) return false
         val delta = packets.mapValues { (key, value) -> value.count - (before[key] ?: 0L) }.filterValues { it > 0 }
@@ -169,6 +177,7 @@ object HuSurvey {
                     .put("sampleDiffersFromIdle", idleSamples[key]?.let { idle -> windowSamples[key]?.any { it !in idle } } == true)
                     .put("candidateByteOffsets", candidateOffsets(key))) }
             })
+        if (evidence != null) entry.put("wizardEvidence", evidence)
         if (results.length() < 200) results.put(entry)
         RawHuDump.mark("TEST_END:${test.id}:$result")
         RawHuDump.meta("survey/test", entry.toString())
