@@ -376,6 +376,12 @@ class QdTransport(
 
     private fun onCommand(msg: JSONObject) {
         val para = msg.optJSONObject("PARA") ?: JSONObject()
+        if (dev.caraalink.diagnostics.HuCapture.active) {
+            val id = msg.optString("CMD").ifBlank { "unknown" }
+            dev.caraalink.diagnostics.HuCapture.record("QDLink-command", "RX", id, details = para.toString())
+            if (id in setOf("CAR_INFO", "VIDEO_ARGS", "SPEECH_ARGS", "VIDEO_SUP_REQ"))
+                dev.caraalink.diagnostics.HuSurvey.advertised("QDLink.$id", para)
+        }
         when (msg.optString("CMD")) {
             "HEARTBEAT" -> if (!carInfo) resendAppStatus()
             "CAR_INFO" -> {
