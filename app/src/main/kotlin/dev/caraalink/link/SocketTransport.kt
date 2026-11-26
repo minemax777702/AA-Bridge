@@ -1,6 +1,8 @@
 package dev.caraalink.link
 
 import android.os.Process
+import dev.caraalink.BuildConfig
+import dev.caraalink.diagnostics.RawHuDump
 import dev.caraalink.diagnostics.DiagnosticLogger
 import java.io.IOException
 import java.net.InetSocketAddress
@@ -94,6 +96,7 @@ class SocketTransport(
             while (true) {
                 val n = input.read(buf)
                 if (n < 0) break
+                stream.traceId?.let { RawHuDump.record(it, RawHuDump.RX, buf, 0, n) }
                 if (reads++ < 2) logger.logBytes("RX tcp:$port", buf, n)
                 synchronized(dispatch) { handler.onData(stream, buf.copyOf(n)) }
             }
@@ -108,6 +111,8 @@ class SocketTransport(
     }
 
     inner class SocketStream(override val localId: Int, val socket: Socket) : MirrorStream {
+        val traceId = if (BuildConfig.HU_DIAGNOSTICS) RawHuDump.streamId("wifi-tcp/${socket.localPort}") else null
+        init { traceId?.let { RawHuDump.meta(it, "open local=${socket.localSocketAddress} remote=${socket.remoteSocketAddress}") } }
         private val queue = LinkedBlockingQueue<Queued>()
         @Volatile override var closed = false
             private set
@@ -117,7 +122,9 @@ class SocketTransport(
             try {
                 val out = socket.getOutputStream()
                 while (!closed) {
-                    out.write(queue.take().bytes)
+                    val bytes = queue.take().bytes
+                    out.write(bytes)
+                    traceId?.let { RawHuDump.record(it, RawHuDump.TX, bytes) }
                 }
             } catch (_: InterruptedException) {
             } catch (e: IOException) {
@@ -138,6 +145,7 @@ class SocketTransport(
         fun close() {
             if (closed) return
             closed = true
+            traceId?.let { RawHuDump.meta(it, "close") }
             writer.interrupt()
             runCatching { socket.close() }
         }
