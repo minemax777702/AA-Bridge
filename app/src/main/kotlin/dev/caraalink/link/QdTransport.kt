@@ -284,6 +284,7 @@ class QdTransport(
     }
 
     private fun sendJson(msgType: Int, text: String, log: Boolean = true) {
+        if (dev.caraalink.diagnostics.HuCapture.active) dev.caraalink.diagnostics.HuCapture.record("QDLink", "TX_BUILT", "json-$msgType", text.toByteArray(Charsets.UTF_8))
         if (log) logger.log("QD TX: $text")
         send(QdFrames.json(msgType, text))
     }
@@ -358,6 +359,7 @@ class QdTransport(
     }
 
     private fun onFrame(msgType: Int, payloadFormat: Int, payload: ByteArray) {
+        if (dev.caraalink.diagnostics.HuCapture.active) dev.caraalink.diagnostics.HuCapture.record("QDLink", "RX", "frame-$msgType", if (payloadFormat == QdFrames.FORMAT_JSON) payload else null, payload.size, "format=$payloadFormat")
         json = true
         when {
             payloadFormat == QdFrames.FORMAT_JSON -> {
@@ -413,6 +415,7 @@ class QdTransport(
 
     /** An old-format car: Version, capture support, the capture request and PlayStatus lead to video. */
     private fun onBin(b: ByteArray, extra: ByteArray) {
+        if (dev.caraalink.diagnostics.HuCapture.active) dev.caraalink.diagnostics.HuCapture.record("QDLink", "RX", "legacy-bin", length = b.size + extra.size)
         if (!bin) {
             // QDLink keeps to the format of the car's first frame.
             if (json) return logger.logBytes("QD RX !BIN in a 5A5A session", b, 96)
