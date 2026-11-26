@@ -190,6 +190,9 @@ object RawHuDump {
                 File(s.dir, "capabilities.json").writeText(HuSurvey.report().toString(2))
             }
             runCatching {
+                File(s.dir, "live-parameters.json").writeText(HuLiveData.report().toString(2))
+            }
+            runCatching {
                 File(s.dir, "manifest.json").writeText(manifest(s, true).toString(2))
             }
             s.finished = true
@@ -205,7 +208,7 @@ object RawHuDump {
         require(dir != current?.dir || !busy)
         ZipOutputStream(BufferedOutputStream(destination)).use { zip ->
             zip.setLevel(1)
-            for (name in listOf("manifest.json", "capabilities.json", "traffic.bin")) {
+            for (name in listOf("manifest.json", "capabilities.json", "live-parameters.json", "traffic.bin")) {
                 val file = File(dir, name)
                 if (!file.isFile) continue
                 zip.putNextEntry(ZipEntry(name))
