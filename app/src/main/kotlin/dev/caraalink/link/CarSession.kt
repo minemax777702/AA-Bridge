@@ -87,10 +87,27 @@ class CarSession(
         val pxc = PxcChannel(logger, { info -> onClientInfo(info) }, features::replyBody).also { this.pxc = it }
         val ctrl = MirrorControlChannel(logger, this, context)
         val data = MirrorDataChannel(logger, this)
+        val tracedCtrl = if (dev.caraalink.BuildConfig.HU_DIAGNOSTICS) {
+            object : AdbTransport.StreamHandler {
+                override fun onOpen(stream: MirrorStream) {
+                    dev.caraalink.diagnostics.HuCapture.record("mirror-control", "RX", "open", details = "stream=${stream.localId}")
+                    ctrl.onOpen(stream)
+                }
+                override fun onData(stream: MirrorStream, data: ByteArray) {
+                    dev.caraalink.diagnostics.HuCapture.record("mirror-control", "RX", "chunk", data,
+                        details = "stream=${stream.localId}")
+                    ctrl.onData(stream, data)
+                }
+                override fun onClose(stream: MirrorStream) {
+                    dev.caraalink.diagnostics.HuCapture.record("mirror-control", "RX", "close", details = "stream=${stream.localId}")
+                    ctrl.onClose(stream)
+                }
+            }
+        } else ctrl
         return { service ->
             when (service) {
                 "tcp:10922" -> pxc
-                "tcp:10921" -> ctrl
+                "tcp:10921" -> tracedCtrl
                 "tcp:10920" -> data
                 else -> null
             }
@@ -131,6 +148,7 @@ class CarSession(
     }
 
     private fun onClientInfo(info: JSONObject) {
+        if (dev.caraalink.diagnostics.HuCapture.active) dev.caraalink.diagnostics.HuCapture.record("PXC", "RX", "client-info", details = info.toString())
         logger.log("Head unit: ${info.optString("HUName")} screenType=${info.optInt("screenType")} " +
             "mirror=${info.optBoolean("supportScreenMirroring")} touch=${info.optBoolean("supportScreenTouch")}")
         ConnectionStateHolder.update {
