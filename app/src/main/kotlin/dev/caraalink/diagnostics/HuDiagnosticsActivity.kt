@@ -69,6 +69,21 @@ class HuDiagnosticsActivity : Activity() {
                     .show()
             }
         }
+        button("Пошаговый мастер диагностики") {
+            if (!RawHuDump.active || !HuCapture.active) notice("Сначала начните полный RAW-дамп и подключитесь к ГУ")
+            else if (HuSurvey.hasActiveTest()) notice("Сначала завершите текущий ручной тест")
+            else if (ConnectionStateHolder.snapshot.phase !in listOf(
+                    dev.caraalink.connection.ConnectionPhase.ATTACHED,
+                    dev.caraalink.connection.ConnectionPhase.STREAMING))
+                notice("Сначала подключитесь к головному устройству")
+            else AlertDialog.Builder(this).setTitle("Пошаговая диагностика")
+                .setMessage("Остановите музыку, установите низкую громкость. Проверки выполняются на безопасной стоянке. Мастер воспроизводит короткие тестовые сигналы и просит подтвердить результат; штатные функции проверяются вручную.")
+                .setNegativeButton("Отмена", null)
+                .setPositiveButton("Начать") { _, _ ->
+                    startActivity(Intent(this, HuWizardActivity::class.java))
+                }.show()
+        }
+        text("Расширенный ручной режим", 18f)
         button("Начать запись (только журнал)") {
             if (RawHuDump.busy) notice("Сначала остановите RAW") else if (HuCapture.start(this)) snapshot()
             status.text = HuCapture.status()
