@@ -130,6 +130,7 @@ class MirrorControlChannel(
     }
 
     private fun handle(stream: MirrorStream, type: Int, body: ByteArray) {
+        if (dev.caraalink.diagnostics.HuCapture.active) dev.caraalink.diagnostics.HuCapture.record("mirror-control", "RX", "0x" + type.toString(16), body)
         // Protocol sniffer (Settings > Debug > "Verbose protocol logging"):
         // normally heartbeat/screen-event are too frequent to log, but when
         // the sniffer is on, log every message with a hex preview.
