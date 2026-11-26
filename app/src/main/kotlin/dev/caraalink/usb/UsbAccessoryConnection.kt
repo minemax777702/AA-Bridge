@@ -37,9 +37,8 @@ class UsbAccessoryConnection private constructor(
 
     private class TraceInput(fd: FileDescriptor, private val id: String) : FileInputStream(fd) {
         override fun read(): Int {
-            val n = super.read()
-            if (n >= 0 && RawHuDump.active) RawHuDump.record(id, RawHuDump.RX, byteArrayOf(n.toByte()))
-            return n
+            val one = ByteArray(1)
+            return if (read(one, 0, 1) == 1) one[0].toInt() and 255 else -1
         }
         override fun read(b: ByteArray): Int = read(b, 0, b.size)
         override fun read(b: ByteArray, off: Int, len: Int): Int {
@@ -51,8 +50,7 @@ class UsbAccessoryConnection private constructor(
 
     private class TraceOutput(fd: FileDescriptor, private val id: String) : FileOutputStream(fd) {
         override fun write(b: Int) {
-            super.write(b)
-            if (RawHuDump.active) RawHuDump.record(id, RawHuDump.TX, byteArrayOf(b.toByte()))
+            write(byteArrayOf(b.toByte()), 0, 1)
         }
         override fun write(b: ByteArray) = write(b, 0, b.size)
         override fun write(b: ByteArray, off: Int, len: Int) {
