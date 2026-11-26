@@ -34,9 +34,12 @@ class PxcChannel(
         val channel = channelOf.remove(stream.localId)
         if (channel == P2C_CHANNEL && p2cStream === stream) {
             p2cStream = null
+            dev.caraalink.diagnostics.HuAudioProbe.detach(carbitAudio)
             stopHeartbeat(stream)
             carbitAudio.reset()
         } else if (channel == 0x10000) {
+            dev.caraalink.diagnostics.HuAudioProbe.detach(carbitAudio)
+            carbitAudio.endDiagnosticProbe()
             carbitAudio.stopMic()
             carbitAudio.stopPlayback()
             carbitAudio.reset()
@@ -116,6 +119,7 @@ class PxcChannel(
             if (cmd == P2C_CHANNEL) {
                 if (p2cStream != null && p2cStream !== stream) carbitAudio.reset()
                 p2cStream = stream
+                dev.caraalink.diagnostics.HuAudioProbe.attach(carbitAudio)
                 startHeartbeat(stream)
             }
             return
@@ -126,6 +130,7 @@ class PxcChannel(
             if (cmd != HEARTBEAT + 1) logger.log("PXC P2C reply 0x${hex(cmd)} len=${body.size}" + preview(body))
             return
         }
+        if (dev.caraalink.diagnostics.HuCapture.active) dev.caraalink.diagnostics.HuSurvey.controlJson(cmd, body)
         if (cmd == CarbitAudioTransport.MIC_DATA) {
             stream.write(head(CarbitAudioTransport.MIC_DATA_ACK, ByteArray(0), extra))
             carbitAudio.onMicData(body)
