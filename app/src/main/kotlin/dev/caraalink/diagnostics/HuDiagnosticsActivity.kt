@@ -56,6 +56,9 @@ class HuDiagnosticsActivity : Activity() {
         text("AA-Bridge Diagnostics", 24f)
         text("Начните запись до подключения к ГУ. Вернитесь на главный экран и подключитесь обычным способом. Проверяйте функции только на стоящем автомобиле. Не отправляйте отчёт без просмотра: неизвестные пакеты могут содержать личные данные.")
         status = text(HuCapture.status())
+        button("Параметры ГУ в реальном времени") {
+            startActivity(Intent(this, HuLiveActivity::class.java))
+        }
         button("Начать полный RAW-дамп") {
             if (RawHuDump.busy || HuCapture.active) {
                 notice("Сначала остановите текущую запись")
