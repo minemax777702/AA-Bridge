@@ -20,7 +20,7 @@ import org.json.JSONObject
 class HuWizardActivity : Activity() {
     private val handler = Handler(Looper.getMainLooper())
     private val ids = listOf("idle", "audio_phone", "audio_bt", "audio_pxc_music", "audio_pxc_tts",
-        "audio_pxc_vr", "audio_pxc_talkie", "display", "touch", "map_zoom", "map_rotate",
+        "audio_pxc_vr", "audio_pxc_talkie", "display", "touch", "map_zoom", "map_rotate", "map_rotate_full",
         "wheel", "media_keys", "navigation", "voice", "volume", "focus", "night",
         "cluster_light", "headlights", "drive_mode", "climate_temp", "climate_fan", "climate_ac",
         "doors", "native_voice", "native_radio", "cluster_nav", "native_exit", "gps",
@@ -164,7 +164,7 @@ class HuWizardActivity : Activity() {
 
     private fun question(id: String): String = when (id) {
         "map_zoom" -> "Карта увеличивается и уменьшается двумя пальцами?"
-        "map_rotate" -> "Карта поворачивается при вращении двух пальцев?"
+        "map_rotate", "map_rotate_full" -> "Карта поворачивается при вращении двух пальцев?"
         "idle", "heartbeat" -> "Соединение оставалось стабильным?"
         "voice" -> "Голосовой помощник распознал речь?"
         "night" -> "Тема Android Auto изменилась вслед за ГУ?"
@@ -182,6 +182,8 @@ class HuWizardActivity : Activity() {
             if (outputs.isNotEmpty()) return false
         }
         if (id.startsWith("audio_pxc_")) return HuAudioProbe.available
+        if (id in listOf("idle", "heartbeat") && ConnectionStateHolder.snapshot.phase !in
+            listOf(ConnectionPhase.ATTACHED, ConnectionPhase.STREAMING)) return false
         return true
     }
 
@@ -252,9 +254,9 @@ class HuWizardActivity : Activity() {
         })
         opened = false; generation++; index++; stage = "ready"; evidence = JSONObject()
         render()
-        // Run the next audio profile automatically if its prerequisites are satisfied.
+        // Open the next observation window automatically; only safe audio/timed steps run code.
         // Bluetooth changes and manual vehicle actions always require a user action.
         val next = id
-        if (next != null && next.startsWith("audio_pxc_") && prerequisites(next)) startStep()
+        if (next != null && prerequisites(next)) startStep()
     }
 }
