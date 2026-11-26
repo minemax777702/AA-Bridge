@@ -19,6 +19,7 @@ class PxcChannel(
     private val onClientInfo: (JSONObject) -> Unit,
     /** Body for the reply to a car request, or null for an empty ack. */
     private val replyBody: (cmd: Int) -> ByteArray? = { null },
+    private val liveOwner: Any? = null,
 ) : AdbTransport.StreamHandler {
 
     private val buffers = HashMap<Int, ByteArray>()
@@ -112,6 +113,7 @@ class PxcChannel(
 
     private fun handle(stream: MirrorStream, cmd: Int, extra: Int, body: ByteArray) {
         dev.caraalink.diagnostics.HuCapture.pxc("RX", cmd, extra, body, stream.localId)
+        if (dev.caraalink.BuildConfig.HU_DIAGNOSTICS) dev.caraalink.diagnostics.HuLiveData.pxc(liveOwner, cmd, body, channelOf[stream.localId] == P2C_CHANNEL)
         if (channelOf[stream.localId] == null) {
             channelOf[stream.localId] = cmd
             logger.log("PXC channel open 0x${hex(cmd)} on stream ${stream.localId}")
