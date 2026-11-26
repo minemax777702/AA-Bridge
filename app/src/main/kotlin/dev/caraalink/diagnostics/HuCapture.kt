@@ -35,12 +35,14 @@ object HuCapture {
         val s = Session(UUID.randomUUID().toString(), SystemClock.elapsedRealtime(),
             DiagnosticLogger(context.applicationContext, "hu-trace"))
         session = s
+        HuSurvey.start()
         record("session", "START", "capture", details = "build=${BuildConfig.GIT_SHA}")
         return true
     }
 
     @Synchronized fun stop() {
         val s = session ?: return
+        HuSurvey.stop()
         session = null
         s.logger.log(JSONObject().put("session", s.id).put("event", "STOP")
             .put("events", s.count).put("dropped", s.dropped).put("estimatedBytes", s.bytes)
@@ -59,6 +61,7 @@ object HuCapture {
         if (!BuildConfig.HU_DIAGNOSTICS || session == null) return
         synchronized(this) {
             val s = session ?: return
+            HuSurvey.observe(protocol, direction, event, length, payload)
             if (s.count >= MAX_EVENTS || s.bytes >= MAX_BYTES) {
                 s.dropped++
                 return
