@@ -138,6 +138,7 @@ class PxcChannel(
             cmd == CLIENT_INFO -> {
                 runCatching {
                     val info = JSONObject(String(body, Charsets.UTF_8))
+                    dev.caraalink.diagnostics.HuSurvey.advertised("PXC.CLIENT_INFO", info)
                     carbitAudio.updateMicAllowed(info.opt("supportMic") == true)
                     onClientInfo(info)
                 }.onFailure { carbitAudio.updateMicAllowed(false) }
@@ -146,6 +147,7 @@ class PxcChannel(
             cmd == CarbitAudioTransport.CAPABILITIES -> {
                 val allowed = runCatching {
                     val info = JSONObject(String(body, Charsets.UTF_8))
+                    dev.caraalink.diagnostics.HuSurvey.advertised("PXC.AUDIO_CAPABILITIES", info)
                     CarbitAudioTransport.Stream.entries.filter {
                         info.opt(it.name.lowercase(java.util.Locale.ROOT)) == true
                     }.toSet()
