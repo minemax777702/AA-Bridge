@@ -162,4 +162,33 @@ class CarbitAudioTransportTest {
         assertNull(audio.pollMic(0))
         assertFalse(audio.requestMic())
     }
+
+    @Test fun `diagnostic probe bypasses capability only for bounded explicit session`() {
+        assertTrue(audio.beginDiagnosticProbe(CarbitAudioTransport.Stream.MUSIC))
+        assertFalse(audio.diagnosticFrame(pcm))
+        assertFalse(audio.playMusic(pcm))
+        assertFalse(audio.requestMic())
+        audio.onReply(CarbitAudioTransport.START_ACK)
+        assertEquals("active", audio.diagnosticStatus())
+        assertTrue(audio.diagnosticFrame(pcm))
+        assertEquals(CarbitAudioTransport.MUSIC, packets.last().first)
+        audio.endDiagnosticProbe()
+        assertEquals(CarbitAudioTransport.STOP, packets.last().first)
+        assertFalse(audio.diagnosticFrame(pcm))
+        audio.onReply(CarbitAudioTransport.STOP_ACK)
+        assertEquals("stopped", audio.diagnosticStatus())
+        assertFalse(audio.playMusic(pcm))
+        assertEquals(3, packets.size)
+    }
+
+    @Test fun `diagnostic timeout blocks late ACK until reconnect`() {
+        assertTrue(audio.beginDiagnosticProbe(CarbitAudioTransport.Stream.MUSIC))
+        time = 1001
+        assertEquals("timeout-reconnect", audio.diagnosticStatus())
+        audio.onReply(CarbitAudioTransport.START_ACK)
+        assertFalse(audio.diagnosticFrame(pcm))
+        assertFalse(audio.beginDiagnosticProbe(CarbitAudioTransport.Stream.TTS))
+        audio.reset()
+        assertTrue(audio.beginDiagnosticProbe(CarbitAudioTransport.Stream.TTS))
+    }
 }
