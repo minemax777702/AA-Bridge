@@ -24,7 +24,7 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: android-actions/setup-android@v3
-      - run: python3 -m unittest discover -s tools -p 'test_decode_hu_dump.py'
+      - run: python3 -m unittest discover -s tools -p 'test_*hu*.py'
       - run: sdkmanager "platforms;android-34"
       - run: chmod +x gradlew && ./gradlew :app:assembleDiagnostics
       - uses: actions/upload-artifact@v4
