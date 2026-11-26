@@ -19,6 +19,48 @@ internal object HuAudioProbe {
         if (target === audio) target = null
     }
 
+    /** Existing PXC microphone negotiation; no playback or upload of recorded samples. */
+    fun runMic(shouldContinue: () -> Boolean, done: (org.json.JSONObject) -> Unit): Boolean {
+        val audio = target ?: return false
+        if (!BuildConfig.HU_DIAGNOSTICS || !RawHuDump.active || !running.compareAndSet(false, true)) return false
+        Thread({
+            val report = org.json.JSONObject().put("source", "PXC HU microphone")
+            var started = false
+            var frames = 0
+            var peak = 0
+            var samples = 0L
+            var squares = 0.0
+            try {
+                started = audio.requestMic()
+                report.put("startRequested", started)
+                if (started) {
+                    val end = android.os.SystemClock.elapsedRealtime() + 3000
+                    while (android.os.SystemClock.elapsedRealtime() < end && shouldContinue() && target === audio) {
+                        val pcm = audio.pollMic(100) ?: continue
+                        frames++
+                        for (i in 0 until pcm.size - 1 step 2) {
+                            val value = ((pcm[i].toInt() and 255) or (pcm[i + 1].toInt() shl 8)).toShort().toInt()
+                            peak = maxOf(peak, kotlin.math.abs(value))
+                            squares += value.toDouble() * value
+                            samples++
+                        }
+                    }
+                }
+                report.put("status", if (frames > 0) "pcm-received" else if (started) "no-pcm" else "not-started")
+            } catch (e: Exception) {
+                report.put("status", "error").put("error", e.javaClass.simpleName)
+            } finally {
+                if (started) runCatching { audio.stopMic() }
+                report.put("frames", frames).put("samples", samples).put("peak", peak)
+                    .put("rms", if (samples > 0) kotlin.math.sqrt(squares / samples) else 0.0)
+                RawHuDump.meta("audio-probe/mic", report.toString())
+                running.set(false)
+                done(report)
+            }
+        }, "HuMicProbe").apply { isDaemon = true }.start()
+        return true
+    }
+
     fun run(profile: CarbitAudioTransport.Stream, shouldContinue: () -> Boolean = { true }, done: (String) -> Unit): Boolean {
         val audio = target ?: return false
         if (!BuildConfig.HU_DIAGNOSTICS || !RawHuDump.active || !running.compareAndSet(false, true)) return false
