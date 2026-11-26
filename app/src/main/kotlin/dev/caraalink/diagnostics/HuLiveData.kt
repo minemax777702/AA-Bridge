@@ -32,18 +32,20 @@ internal object HuLiveData {
         owner = session
         connected = true
         started = System.currentTimeMillis()
-        fields.clear(); packets.clear(); changes.clear(); dropped = 0; omitted = 0
+        fields.clear(); packets.clear(); omitted = 0
+        change("connection", "session", null, started.toString(), "session-start")
     }
     @Synchronized fun end(session: Any) {
         if (owner !== session || !connected) return
         connected = false
+        owner = null
         change("connection", "link", "active", "closed", "session")
     }
     private fun accepts(session: Any?): Boolean = BuildConfig.HU_DIAGNOSTICS && session != null && owner === session && connected
 
     private fun change(source: String, field: String, old: String?, value: String?, kind: String) {
         val event = JSONObject().put("timeMs", System.currentTimeMillis())
-            .put("elapsedMs", SystemClock.elapsedRealtime()).put("source", source).put("field", field)
+            .put("elapsedMs", SystemClock.elapsedRealtime()).put("sessionStartedMs", started).put("source", source).put("field", field)
             .put("old", old ?: JSONObject.NULL).put("new", value ?: JSONObject.NULL).put("kind", kind)
         if (changes.size == MAX_CHANGES) { changes.removeFirst(); dropped++ }
         changes.addLast(event)
@@ -201,11 +203,15 @@ internal object HuLiveData {
     @Synchronized fun packetRows(): List<Row> = packets.map { (key, p) ->
         Row(key, "${p.count} пак. · ${p.size} Б", key, "observed", p.at)
     }
+    @Synchronized fun mark(label: String) {
+        if (BuildConfig.HU_DIAGNOSTICS && label.isNotBlank()) change("user", "marker", null, label.take(200), "manual-marker")
+    }
     @Synchronized fun history(): List<JSONObject> = changes.toList()
     @Synchronized fun status(): String = "${fields.size} полей · ${packets.size} типов · ${changes.size} изменений · вытеснено $dropped · лимит $omitted"
     @Synchronized fun report(): JSONObject = JSONObject().put("schema", 1)
         .put("sessionStartedMs", started).put("connectionActive", connected)
         .put("historyDropped", dropped).put("omitted", omitted)
+        .put("snapshotTimeMs", System.currentTimeMillis()).put("historyScope", "last 2000 changes across connections in current app process; current fields are last session only")
         .put("parameters", JSONArray(rows().map { JSONObject().put("label", it.label).put("value", it.value)
             .put("source", it.source).put("kind", it.kind).put("lastReceivedMs", it.at) }))
         .put("rawFields", JSONArray(rawFields().map { JSONObject().put("source", it.source).put("value", it.value)
