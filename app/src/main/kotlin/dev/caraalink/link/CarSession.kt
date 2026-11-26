@@ -89,7 +89,7 @@ class CarSession(
         val pxc = PxcChannel(logger, { info -> onClientInfo(info) }, features::replyBody, liveOwner = this).also { this.pxc = it }
         val ctrl = MirrorControlChannel(logger, this, context, liveOwner = this)
         val data = MirrorDataChannel(logger, this)
-        val instrument = if (dev.caraalink.BuildConfig.HU_DIAGNOSTICS) InstrumentChannel(this) else null
+        val instrument = if (dev.caraalink.BuildConfig.HU_DIAGNOSTICS) InstrumentChannel(this).also { it.listenerStatus("waiting") } else null
         val tracedCtrl = if (dev.caraalink.BuildConfig.HU_DIAGNOSTICS) {
             object : AdbTransport.StreamHandler {
                 override fun onOpen(stream: MirrorStream) {
