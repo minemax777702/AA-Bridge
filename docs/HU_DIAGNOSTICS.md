@@ -86,3 +86,11 @@ References (not a claim of exact firmware compatibility):
 - ScanDoc SX11 multimedia diagnostic overview: https://scandoc.online/last/0/84/22/9
 - Owner forum: https://4pda.to/forum/index.php?showtopic=1001500
 Different generations and firmware are not interchangeable.
+
+## Sequential wizard and rotation A/B
+
+Start a full RAW capture before connecting; once connected, open "Пошаговый мастер диагностики". Begin the baseline test, then answer Да / Нет / Не уверен / Пропустить. Each answer closes its observation window and opens the next automatically if prerequisites are met. For Android media output with no BT, disable Bluetooth audio; for BT media, connect only the car's media output. The wizard requests the selected device on an isolated AudioTrack and records the actual routed device; it cannot switch Bluetooth on/off or guarantee Android honors a route. PXC profiles run sequentially without permanent overrides. After timeout reconnect before the next PXC test. All signals are short and quiet; set HU volume low. Manual vehicle observations remain manual and must be safe while parked. No new vehicle commands.
+
+The RAW capture includes `gesture/hu-input` (original and scaled coordinates), `gesture/aa-input-sent` (action, actionIndex, all pointer IDs and coordinates after successful local write) and `gesture/aa-input-filtered` (multi-finger events dropped by the standard 30 ms limiter). Repeat zoom and rotation on the same map. The special `map_rotate_full` test temporarily bypasses the move limiter for two or more pointers only; all other input behavior is unchanged. It is an A/B diagnostic, not a confirmed fix. Compare the two rotation results and event streams. A map app may itself restrict rotation.
+
+Answers, observed routes and transport result are recorded in capabilities.json under manualTests[].wizardEvidence and in RAW timeline. A user saying yes without verified audio routing is recorded as inconclusive. Back exits the wizard; completed results stay in the current capture, but restarting the wizard starts at the first question. The final button stops recording; export ZIP from diagnostics.
