@@ -76,6 +76,41 @@ class HuDiagnosticsActivity : Activity() {
         button("Снимок устройств и соединения") {
             if (HuCapture.active || RawHuDump.active) snapshot() else notice("Сначала начните запись")
         }
+        text("Прямой звук PXC (без Bluetooth)", 20f)
+        button("Проверить аудиопрофиль") {
+            if (!RawHuDump.active) notice("Сначала начните полный RAW-дамп и подключитесь к ГУ")
+            else {
+                val profiles = HuAudioProbe.profiles
+                AlertDialog.Builder(this).setTitle("Известные профили PXC")
+                    .setItems(profiles.map { "${it.name} · ${it.rate} Гц · ${it.channels} кан." }.toTypedArray()) { _, index ->
+                        val profile = profiles[index]
+                        AlertDialog.Builder(this)
+                            .setTitle("Тест ${profile.name}")
+                            .setMessage("Только на стоянке. Остановите музыку и голосовой помощник, отключите Bluetooth телефона и установите низкую громкость ГУ. Будет отправлен тихий сигнал длительностью до 1 секунды, даже если ГУ объявило канал недоступным. После ошибки переподключитесь. Запуск не доказывает слышимость.")
+                            .setNegativeButton("Отмена", null)
+                            .setPositiveButton("Проверить") { _, _ ->
+                                val audio = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+                                val btTypes = setOf(android.media.AudioDeviceInfo.TYPE_BLUETOOTH_A2DP, android.media.AudioDeviceInfo.TYPE_BLUETOOTH_SCO, android.media.AudioDeviceInfo.TYPE_BLE_HEADSET, android.media.AudioDeviceInfo.TYPE_BLE_SPEAKER)
+                                val bt = audio.getDevices(AudioManager.GET_DEVICES_OUTPUTS).any { it.type in btTypes }
+                                if (bt) { notice("Отключите Bluetooth-аудиоустройства перед тестом"); return@setPositiveButton }
+                                RawHuDump.meta("audio-probe", "no Bluetooth output devices reported by AudioManager")
+                                if (!HuAudioProbe.run(profile) { result ->
+                                    runOnUiThread {
+                                        if (!isFinishing && !isDestroyed) {
+                                            AlertDialog.Builder(this)
+                                                .setTitle("Результат ${profile.name}")
+                                                .setMessage(result + "\nСлышали сигнал из динамиков ГУ?")
+                                                .setPositiveButton("Да") { _, _ -> RawHuDump.mark("AUDIO_HEARD:${profile.name}:yes") }
+                                                .setNegativeButton("Нет") { _, _ -> RawHuDump.mark("AUDIO_HEARD:${profile.name}:no") }
+                                                .setNeutralButton("Неясно") { _, _ -> RawHuDump.mark("AUDIO_HEARD:${profile.name}:uncertain") }
+                                                .show()
+                                        }
+                                    }
+                                }) notice("Нет PXC-соединения или тест уже выполняется")
+                            }.show()
+                    }.show()
+            }
+        }
         text("Мастер проверки возможностей", 20f)
         button("Выбрать сценарий") {
             if (!HuCapture.active) notice("Сначала начните запись") else {
