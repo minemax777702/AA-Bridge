@@ -476,6 +476,9 @@ class CarSession(
         // Car coordinates are in its own screen size; the encoder may be a few pixels smaller.
         val fx = x * enc.width.toFloat() / c.width
         val fy = y * enc.height.toFloat() / c.height
+        if (dev.caraalink.diagnostics.RawHuDump.active) dev.caraalink.diagnostics.RawHuDump.meta(
+            "gesture/hu-input", org.json.JSONObject().put("action", action).put("slot", slot)
+                .put("x", x).put("y", y).put("mappedX", fx.toDouble()).put("mappedY", fy.toDouble()).toString())
         display.touch(action, fx, fy, slot)
     }
 
