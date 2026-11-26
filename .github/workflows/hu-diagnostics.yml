@@ -34,8 +34,10 @@ jobs:
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-34" "build-tools;36.0.0"
       - name: Verify Gradle Wrapper
         run: echo "498495120a03b9a6ab5d155f5de3c8f0d986a449153702fb80fc80e134484f17  gradle/wrapper/gradle-wrapper.jar" | sha256sum -c -
-      - name: Build diagnostics and run JVM unit tests
-        run: chmod +x gradlew && ./gradlew :app:assembleDiagnostics :app:testDiagnosticsUnitTest --no-daemon
+      - name: Run shared JVM unit tests (debug variant)
+        run: chmod +x gradlew && ./gradlew :app:testDebugUnitTest --no-daemon
+      - name: Build diagnostics APK
+        run: ./gradlew :app:assembleDiagnostics --no-daemon
       - name: Verify APK signature and prepare checksums
         run: |
           set -euo pipefail
