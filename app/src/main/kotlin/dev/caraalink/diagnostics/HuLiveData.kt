@@ -62,7 +62,7 @@ internal object HuLiveData {
         val old = fields[key]
         if (old == null && fields.size >= MAX_FIELDS) { omitted++; return }
         fields[key] = Value(text, type, System.currentTimeMillis())
-        if (old?.text != text || old.type != type) change(source, name, old?.text, text, "json-$type")
+        if (old == null || old.text != text || old.type != type) change(source, name, old?.text, text, "json-$type")
     }
 
     private fun flatten(source: String, json: JSONObject) {
@@ -164,7 +164,7 @@ internal object HuLiveData {
         val info = "PXC/0x00010010"
         val audio = "PXC/0x00010020"
         val night = fields["PXC/0x00010200/night"]
-        out.add(Row("Ночной режим", if (night?.type != "boolean") "Нет данных" else if (night.text == "true") "Да" else "Нет",
+        out.add(Row("Ночной режим", if (night == null || night.type != "boolean") "Нет данных" else if (night.text == "true") "Да" else "Нет",
             "PXC/0x00010200/night", if (night?.type == "boolean") "state" else "unknown", night?.at ?: 0))
         // No verified protocol mapping for these vehicle signals yet.
         listOf("Зажигание", "Двигатель запущен", "Дверь водителя", "Передняя правая дверь", "Задняя левая дверь",
