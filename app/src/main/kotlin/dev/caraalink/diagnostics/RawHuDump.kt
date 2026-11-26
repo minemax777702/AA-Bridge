@@ -90,6 +90,32 @@ object RawHuDump {
         return "RAW: $state • ${s.recordsWritten} записей • ${s.written / (1024 * 1024)} МиБ / ${s.limit / (1024 * 1024)} МиБ"
     }
 
+    fun wrapInput(source: java.io.InputStream, id: String): java.io.InputStream = object : java.io.FilterInputStream(source) {
+        override fun read(): Int {
+            val value = source.read()
+            if (value >= 0 && active) record(id, RX, byteArrayOf(value.toByte()))
+            return value
+        }
+        override fun read(b: ByteArray): Int = read(b, 0, b.size)
+        override fun read(b: ByteArray, off: Int, len: Int): Int {
+            val n = source.read(b, off, len)
+            if (n > 0) record(id, RX, b, off, n)
+            return n
+        }
+    }
+
+    fun wrapOutput(destination: java.io.OutputStream, id: String): java.io.OutputStream = object : java.io.FilterOutputStream(destination) {
+        override fun write(b: Int) {
+            destination.write(b)
+            if (active) record(id, TX, byteArrayOf(b.toByte()))
+        }
+        override fun write(b: ByteArray) = write(b, 0, b.size)
+        override fun write(b: ByteArray, off: Int, len: Int) {
+            destination.write(b, off, len)
+            record(id, TX, b, off, len)
+        }
+    }
+
     fun mark(label: String) = record("manual", MARK, label.toByteArray(Charsets.UTF_8))
     fun meta(stream: String, label: String) = record(stream, META, label.toByteArray(Charsets.UTF_8))
 
