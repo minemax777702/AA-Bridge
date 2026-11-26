@@ -13,7 +13,7 @@ FEATURES = {
     "navigation": ("PXC.AUDIO_CAPABILITIES.",),
     "gear": (), "parking": (), "sensors": (), "doors": (), "climate": (),
     "wheel": (), "night": (), "volume": (), "ignition": (), "wireless": (),
-    "reconnect": (), "idle": (),
+    "reconnect": (), "idle": (), "call": (), "gps": (), "focus": (), "heartbeat": (),
 }
 # Direction matters: this is the HU asking for PHONE GPS, not a vehicle GPS feed.
 KNOWN = {
@@ -67,7 +67,8 @@ def analyze(manifest, survey):
             if item.get("absentInIdleWindow") or item.get("sampleDiffersFromIdle"):
                 candidates.setdefault(key, []).append(dict(scenario=scenario,
                     absent_in_idle=item.get("absentInIdleWindow", False),
-                    sampled_change=item.get("sampleDiffersFromIdle", False)))
+                    sampled_change=item.get("sampleDiffersFromIdle", False),
+                    candidate_byte_offsets=item.get("candidateByteOffsets", [])))
     return dict(session=manifest.get("session"), capture_claims_complete=manifest.get("completeUntilStop"),
                 features=features, observed_known=[dict(id=p["id"], count=p.get("count"), meaning=KNOWN[p["id"]])
                     for p in packets if p.get("id") in KNOWN],
