@@ -18,7 +18,7 @@ internal object HuAudioProbe {
         if (target === audio) target = null
     }
 
-    fun run(profile: CarbitAudioTransport.Stream, done: (String) -> Unit): Boolean {
+    fun run(profile: CarbitAudioTransport.Stream, shouldContinue: () -> Boolean = { true }, done: (String) -> Unit): Boolean {
         val audio = target ?: return false
         if (!BuildConfig.HU_DIAGNOSTICS || !RawHuDump.active || !running.compareAndSet(false, true)) return false
         Thread({
@@ -33,14 +33,14 @@ internal object HuAudioProbe {
                 event("begin: explicit test, advertised flags unchanged")
                 started = audio.beginDiagnosticProbe(profile)
                 if (started) {
-                    while (audio.diagnosticStatus() == "starting" && RawHuDump.active && target === audio)
+                    while (audio.diagnosticStatus() == "starting" && RawHuDump.active && target === audio && shouldContinue())
                         Thread.sleep(25)
                     result = audio.diagnosticStatus()
-                    if (result == "active" && RawHuDump.active && target === audio) {
+                    if (result == "active" && RawHuDump.active && target === audio && shouldContinue()) {
                         // 20 ms frames, 440 Hz, about -34 dBFS, fade in/out, 1 second max.
                         val count = profile.rate / 50
                         for (frame in 0 until 50) {
-                            if (!RawHuDump.active || target !== audio) break
+                            if (!RawHuDump.active || target !== audio || !shouldContinue()) break
                             val pcm = ByteArray(count * profile.channels * 2)
                             for (i in 0 until count) {
                                 val n = frame * count + i
