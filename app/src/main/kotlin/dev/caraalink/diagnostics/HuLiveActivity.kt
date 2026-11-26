@@ -57,6 +57,15 @@ class HuLiveActivity : Activity() {
             content.addView(line)
         }
         content.addView(Button(this).apply {
+            text = "Отметить действие"; isAllCaps = false
+            setOnClickListener {
+                val input = android.widget.EditText(this@HuLiveActivity).apply { hint = "Например: открыта дверь водителя"; setSingleLine() }
+                android.app.AlertDialog.Builder(this@HuLiveActivity).setTitle("Метка наблюдения").setView(input)
+                    .setNegativeButton("Отмена", null)
+                    .setPositiveButton("Записать") { _, _ -> HuLiveData.mark(input.text.toString()); update() }.show()
+            }
+        })
+        content.addView(Button(this).apply {
             text = "Экспорт таблицы и истории JSON"; isAllCaps = false
             setOnClickListener {
                 if (!exportInProgress) {
@@ -109,7 +118,7 @@ class HuLiveActivity : Activity() {
             else -> HuLiveData.rows()
         }
         // Keep the table scroll stable when no displayed value changes.
-        val signature = rows.joinToString("\n") { "${it.label}|${it.value}|${it.kind}|${it.at}" }
+        val signature = rows.joinToString("\n") { "${it.label}|${it.value}|${it.kind}|${it.at / 10000}" }
         if (signature == last) return
         last = signature
         table.removeAllViews()
