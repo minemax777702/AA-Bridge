@@ -3,6 +3,14 @@ on:
   workflow_dispatch:
   push:
     branches: [feat/hu-diagnostics-apk]
+  pull_request:
+    branches: [main]
+    paths:
+      - "app/**"
+      - ".github/workflows/hu-diagnostics.yml"
+concurrency:
+  group: hu-diagnostics-${{ github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
