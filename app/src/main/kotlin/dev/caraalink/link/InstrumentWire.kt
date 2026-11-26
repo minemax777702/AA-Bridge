@@ -151,6 +151,14 @@ internal object InstrumentWire {
                 field("ODO", 6, 0, 23, 8, 7)
                 field("TRIP1", 9, 0, 15, 10, 7)
                 field("TRIP2", 11, 0, 15, 12, 7)
+                field("TOTAL_DRIVE_TIME", 17, 0, 31, 20, 7)
+                field("TRIP1_AVG_SPEED", 23, 0, 12, 24, 4)
+                field("TRIP1_DRIVE_TIME", 27, 0, 31, 30, 7)
+                field("TRIP2_AVG_SPEED", 31, 0, 12, 32, 4)
+                field("TRIP2_DRIVE_TIME", 35, 0, 31, 38, 7)
+                field("TIMER_AVG_SPEED", 39, 0, 12, 40, 4)
+                field("TIMER_AVG_CONSUME", 41, 0, 15, 42, 7)
+                field("TIMER_TIME", 43, 0, 31, 46, 7)
                 field("RANGE_LEFT", 47, 0, 15, 48, 7)
             }
         }
