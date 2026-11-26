@@ -131,6 +131,7 @@ class HuLiveActivity : Activity() {
             val line = LinearLayout(this).apply { setBackgroundColor(colors[i % 2]) }
             val color = when (row.kind) {
                 "state", "observed" -> Color.parseColor("#86EFAC")
+                "stale" -> Color.parseColor("#FBBF24")
                 "advertised" -> Color.parseColor("#93C5FD")
                 "unknown" -> Color.parseColor("#A1A1AA")
                 else -> Color.WHITE
@@ -138,6 +139,7 @@ class HuLiveActivity : Activity() {
             line.addView(label(row.label + "\n" + row.source, 13f, Color.WHITE), LinearLayout.LayoutParams(0, -2, 1f))
             val kind = when (row.kind) {
                 "state" -> "Полученное состояние"
+                "stale" -> "Последнее значение (не актуальное)"
                 "advertised" -> "Объявлено ГУ"
                 "unknown" -> "Не установлено"
                 "info" -> "Параметр ГУ"
