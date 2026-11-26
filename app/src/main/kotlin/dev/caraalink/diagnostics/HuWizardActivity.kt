@@ -139,6 +139,8 @@ class HuWizardActivity : Activity() {
                     text(if (test.id == "audio_bt") "Подключите Bluetooth автомобиля (один медиавыход)." else
                         "Отключите Bluetooth-аудио. Остановите музыку и голосового помощника, установите низкую громкость.")
                     button("Настройки Bluetooth") { startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS)) }
+                    if (test.id.startsWith("audio_pxc_") && !HuAudioProbe.available)
+                        text("PXC не готов. После тайм-аута переподключите ГУ; при отсутствии канала пропустите тест.")
                 }
                 button(if (audio) "Воспроизвести сигнал" else "Начать проверку") { startStep() }
                 button("Пропустить") { skip() }
@@ -147,7 +149,13 @@ class HuWizardActivity : Activity() {
             "answer" -> {
                 if (audio) {
                     text("Слышали сигнал именно из динамиков автомобиля?", 19f)
-                    text(evidence.toString())
+                    val verified = if (test.id.startsWith("audio_pxc_")) evidence.optBoolean("signalQueued")
+                        else evidence.optBoolean("routeVerified") && evidence.optString("status") == "played"
+                    text(if (verified) "Тестовый сигнал отправлен, подтвердите слышимость."
+                        else "Маршрут или передача сигнала не подтверждены. Результат будет отмечен как неопределённый.")
+                    if (test.id.startsWith("audio_pxc_") && !verified)
+                        text("При тайм-ауте переподключите ГУ перед следующей проверкой.")
+                    text("Технический результат: " + evidence.optString("status", "—"))
                 } else text(question(test.id), 19f)
                 button("Да") { answer("yes") }
                 button("Нет") { answer("no") }
@@ -171,6 +179,13 @@ class HuWizardActivity : Activity() {
         "wheel", "media_keys" -> "Android Auto отреагировал на кнопку?"
         "cluster_nav" -> "Подсказка появилась на приборной панели?"
         "gps" -> "Положение на карте соответствует текущему?"
+        "display" -> "Изображение Android Auto отображается корректно?"
+        "touch" -> "Касания и свайпы отрабатывают корректно?"
+        "volume" -> "Громкость изменяется штатными кнопками?"
+        "drive_mode" -> "Штатный интерфейс показал изменение режима движения?"
+        "cluster_light" -> "Яркость приборной панели изменилась?"
+        "navigation" -> "Навигационная подсказка слышна в автомобиле?"
+        "focus" -> "Звук восстановился при возврате в Android Auto?"
         else -> "Наблюдаемая штатная функция сработала?"
     }
 
